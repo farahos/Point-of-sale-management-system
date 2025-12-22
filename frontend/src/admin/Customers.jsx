@@ -16,7 +16,7 @@ const Customer = () => {
   const [showModal, setShowModal] = useState(false);
   const [modalTitle, setModalTitle] = useState('Add New Customer');
   
-  const API_URL = 'https://inventoryapp-tucd.onrender.com/api/customers';
+  const API_URL = 'https://backendapp-qtb2.onrender.com/api/customers';
 
   // Fetch all customers
   const fetchCustomers = async () => {

@@ -3,7 +3,7 @@ import axios from "axios";
 import jsPDF from "jspdf";
 import { X, Search, Edit, Trash2, FileText, Check, AlertCircle } from "lucide-react";
 
-const API_URL = "https://inventoryapp-tucd.onrender.com/api/repairs";
+const API_URL = "https://backendapp-qtb2.onrender.com/api/repairs";
 
 const Repair = () => {
   const [repairs, setRepairs] = useState([]);

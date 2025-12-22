@@ -24,7 +24,7 @@ const Sales = () => {
   const [showSaleModal, setShowSaleModal] = useState(false);
   const [modalTitle, setModalTitle] = useState('New Sale');
   
-  const API_URL = 'https://inventoryapp-tucd.onrender.com/api/sales';
+  const API_URL = 'https://backendapp-qtb2.onrender.com/api/sales';
 
   // Fetch initial data
   useEffect(() => {
