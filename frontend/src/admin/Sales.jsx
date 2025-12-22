@@ -56,7 +56,7 @@ const Sales = () => {
   const fetchProducts = async () => {
     try {
       setLoadingProducts(true);
-      const response = await axios.get('/api/products');
+      const response = await axios.get('https://backendapp-qtb2.onrender.com/api/products');
       setProducts(response.data.data || []);
     } catch (err) {
       console.error('Failed to fetch products:', err);
@@ -68,7 +68,7 @@ const Sales = () => {
   // Fetch customers for dropdown
   const fetchCustomers = async () => {
     try {
-      const response = await axios.get('/api/customers');
+      const response = await axios.get('https://backendapp-qtb2.onrender.com/api/customers');
       setCustomers(response.data.data || []);
     } catch (err) {
       console.error('Failed to fetch customers:', err);
