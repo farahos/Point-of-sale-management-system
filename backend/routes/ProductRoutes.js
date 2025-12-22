@@ -30,7 +30,7 @@ router.post("/",  createProduct);
  * @query   sortBy - Field to sort by (default: createdAt)
  * @query   sortOrder - Sort order: asc or desc (default: desc)
  */
-router.get("/", authenticate, getAllProducts);
+router.get("/", getAllProducts);
 
 /**
  * @route   GET /api/products/stats
@@ -51,7 +51,7 @@ router.get("/:id", getProductById);
  * @desc    Update product by ID
  * @access  Public
  */
-router.put("/:id",authenticate, updateProduct);
+router.put("/:id", updateProduct);
 
 /**
  * @route   PATCH /api/products/:id/quantity
