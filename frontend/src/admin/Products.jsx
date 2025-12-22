@@ -24,7 +24,7 @@ const Product = () => {
   const [stats, setStats] = useState(null);
   const [modalTitle, setModalTitle] = useState('Add New Product');
   
-  const API_URL = '/api/products';
+  const API_URL = 'https://inventoryapp-tucd.onrender.com/api/products';
 
   // Fetch all products
   const fetchProducts = async () => {

@@ -11,9 +11,17 @@ import ProductRoutes from './routes/ProductRoutes.js'
 import SalesRoutes from  './routes/SalesRoutes.js'
 import debtRoutes from  './routes/debtRoutes.js'
 import repairRoutes from './routes/repairRoutes.js';
+import cors from 'cors';
 
 const app = express();
 const PORT = 8000
+
+// ✅ CORS FIRST (MUHIIM)
+app.use(cors({
+  origin: 'https://inventory-management-system-1mcj.onrender.com',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  credentials: true
+}));
 
 app.use(express.json());
 app.use(cookieParser());

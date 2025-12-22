@@ -229,10 +229,10 @@ const Dashboard = () => {
         repairs,
         sales
       ] = await Promise.all([
-        fetchData('/api/products'),
-        fetchData('/api/customers'),
-        fetchData('/api/repairs'),
-        fetchData('/api/sales')
+        fetchData('https://inventoryapp-tucd.onrender.com/api/products'),
+        fetchData('https://inventoryapp-tucd.onrender.com/api/customers'),
+        fetchData('https://inventoryapp-tucd.onrender.com/api/repairs'),
+        fetchData('https://inventoryapp-tucd.onrender.com/api/sales')
       ]);
 
       // Calculate products stats
