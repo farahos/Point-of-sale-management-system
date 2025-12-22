@@ -21,7 +21,7 @@ import Products from './admin/Products.jsx';
 import Sales from './admin/Sales.jsx';
 import Debts from './admin/Debts.jsx';
 import Repairing from './admin/Repairing.jsx';
-import Users from './admin/users.jsx';
+import Users from './admin/Users.jsx';
 
 
 
