@@ -30,7 +30,7 @@ const Repair = () => {
   const [showRepairModal, setShowRepairModal] = useState(false);
   const [modalTitle, setModalTitle] = useState('New Repair');
   
-  const API_URL = '/api/repairs';
+  const API_URL = 'https://backendapp-qtb2.onrender.com/api/repairs';
 
   // Fetch initial data
   useEffect(() => {
@@ -63,7 +63,7 @@ const Repair = () => {
   const fetchProducts = async () => {
     try {
       setLoadingProducts(true);
-      const response = await axios.get('/api/products');
+      const response = await axios.get('https://backendapp-qtb2.onrender.com/api/products');
       setProducts(response.data.data || []);
     } catch (err) {
       console.error('Failed to fetch products:', err);
@@ -75,7 +75,7 @@ const Repair = () => {
   // Fetch customers for dropdown
   const fetchCustomers = async () => {
     try {
-      const response = await axios.get('/api/customers');
+      const response = await axios.get('https://backendapp-qtb2.onrender.com/api/customers');
       setCustomers(response.data.data || []);
     } catch (err) {
       console.error('Failed to fetch customers:', err);
@@ -139,7 +139,7 @@ const Repair = () => {
 
     try {
       // First, get the product to check stock
-      const productResponse = await axios.get(`/api/products/${formData.productId}`);
+      const productResponse = await axios.get(`https://backendapp-qtb2.onrender.com/api/products/${formData.productId}`);
       const product = productResponse.data.data;
       
       if (!product || product.quantity <= 0) {
@@ -167,7 +167,7 @@ const Repair = () => {
         });
         
         // Decrement product quantity by 1 (like sales)
-        await axios.put(`/api/products/${formData.productId}`, {
+        await axios.put(`https://backendapp-qtb2.onrender.com/api/products/${formData.productId}`, {
           quantity: product.quantity - 1
         });
         
