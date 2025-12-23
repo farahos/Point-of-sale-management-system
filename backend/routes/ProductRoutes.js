@@ -1,78 +1,36 @@
-import express from "express";
+import express from 'express';
 import {
   createProduct,
   getAllProducts,
   getProductById,
   updateProduct,
-  updateProductQuantity,
   deleteProduct,
+  updateProductQuantity,
   bulkDeleteProducts,
-  getProductStats
-} from "../controller/ProductController.js";
-import { authenticate, authorizeRoles } from "../middleware/authmiddleware.js";
+  getProductStats,
+  getProductsByCategory
+} from '../controller/productController.js';
 
 const router = express.Router();
 
-/**
- * @route   POST /api/products
- * @desc    Create a new product
- * @access  Public
- */
-router.post("/",  createProduct);
+// Public routes
+router.route('/')
+  .post(createProduct)        // Create new product
+  .get(getAllProducts)        // Get all products with pagination & search
+  .delete(bulkDeleteProducts); // Bulk delete products
 
-/**
- * @route   GET /api/products
- * @desc    Get all products with pagination, search, and sorting
- * @access  Public
- * @query   page - Page number (default: 1)
- * @query   limit - Items per page (default: 10)
- * @query   search - Search term for product name
- * @query   sortBy - Field to sort by (default: createdAt)
- * @query   sortOrder - Sort order: asc or desc (default: desc)
- */
-router.get("/", getAllProducts);
+router.route('/stats')
+  .get(getProductStats);      // Get product statistics
 
-/**
- * @route   GET /api/products/stats
- * @desc    Get product statistics
- * @access  Public
- */
-router.get("/stats", getProductStats);
+router.route('/category/:category')
+  .get(getProductsByCategory); // Get products by category
 
-/**
- * @route   GET /api/products/:id
- * @desc    Get single product by ID
- * @access  Public
- */
-router.get("/:id", getProductById);
+router.route('/:id')
+  .get(getProductById)        // Get single product by ID
+  .put(updateProduct)         // Update product
+  .delete(deleteProduct);     // Delete single product
 
-/**
- * @route   PUT /api/products/:id
- * @desc    Update product by ID
- * @access  Public
- */
-router.put("/:id", updateProduct);
-
-/**
- * @route   PATCH /api/products/:id/quantity
- * @desc    Update product quantity (add/remove stock)
- * @access  Public
- */
-router.patch("/:id/quantity", updateProductQuantity);
-
-/**
- * @route   DELETE /api/products/:id
- * @desc    Delete single product by ID
- * @access  Public
- */
-router.delete("/:id", deleteProduct);
-
-/**
- * @route   DELETE /api/products
- * @desc    Bulk delete products by IDs array
- * @access  Public
- * @body    { ids: [string] } - Array of product IDs to delete
- */
-router.delete("/", bulkDeleteProducts);
+router.route('/:id/quantity')
+  .patch(updateProductQuantity); // Update product quantity
 
 export default router;

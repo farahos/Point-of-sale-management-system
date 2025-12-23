@@ -3,9 +3,13 @@ import axios from 'axios';
 
 const Product = () => {
   const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [formData, setFormData] = useState({
     name: '',
+    sku: '',
+    category: '',
     costPrice: '',
+    sellingPrice: '',
     quantity: ''
   });
   const [stockUpdateData, setStockUpdateData] = useState({
@@ -23,6 +27,7 @@ const Product = () => {
   const [selectedProductForStock, setSelectedProductForStock] = useState(null);
   const [stats, setStats] = useState(null);
   const [modalTitle, setModalTitle] = useState('Add New Product');
+  const [selectedCategory, setSelectedCategory] = useState('all');
   
   const API_URL = 'https://backendapp-qtb2.onrender.com/api/products';
 
@@ -30,8 +35,17 @@ const Product = () => {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_URL}?search=${searchTerm}`);
+      let url = `${API_URL}?search=${searchTerm}`;
+      if (selectedCategory !== 'all') {
+        url += `&category=${selectedCategory}`;
+      }
+      const response = await axios.get(url);
       setProducts(response.data.data || []);
+      
+      if (response.data.filters?.categories) {
+        setCategories(response.data.filters.categories);
+      }
+      
       if (response.data.statistics) {
         setStats(response.data.statistics);
       }
@@ -57,7 +71,7 @@ const Product = () => {
   useEffect(() => {
     fetchProducts();
     fetchStats();
-  }, [searchTerm]);
+  }, [searchTerm, selectedCategory]);
 
   // Handle form input changes
   const handleInputChange = (e) => {
@@ -81,13 +95,28 @@ const Product = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!formData.name.trim() || !formData.costPrice || !formData.quantity) {
+    // Validate required fields
+    const requiredFields = ['name', 'sku', 'category', 'costPrice', 'sellingPrice', 'quantity'];
+    const missingFields = requiredFields.filter(field => !formData[field]);
+    
+    if (missingFields.length > 0) {
       setError('All fields are required');
       return;
     }
 
+    // Validate numeric fields
     if (parseFloat(formData.costPrice) <= 0) {
       setError('Cost price must be greater than 0');
+      return;
+    }
+
+    if (parseFloat(formData.sellingPrice) <= 0) {
+      setError('Selling price must be greater than 0');
+      return;
+    }
+
+    if (parseFloat(formData.sellingPrice) < parseFloat(formData.costPrice)) {
+      setError('Selling price must be greater than or equal to cost price');
       return;
     }
 
@@ -97,13 +126,21 @@ const Product = () => {
     }
 
     try {
+      const formattedData = {
+        ...formData,
+        costPrice: parseFloat(formData.costPrice),
+        sellingPrice: parseFloat(formData.sellingPrice),
+        quantity: parseInt(formData.quantity),
+        sku: formData.sku.toUpperCase()
+      };
+
       if (editingId) {
         // Update existing product
-        await axios.put(`${API_URL}/${editingId}`, formData);
+        await axios.put(`${API_URL}/${editingId}`, formattedData);
         setSuccessMessage('Product updated successfully!');
       } else {
         // Create new product
-        await axios.post(API_URL, formData);
+        await axios.post(API_URL, formattedData);
         setSuccessMessage('Product created successfully!');
       }
       
@@ -158,7 +195,10 @@ const Product = () => {
   const handleEdit = (product) => {
     setFormData({
       name: product.name,
+      sku: product.sku,
+      category: product.category,
       costPrice: product.costPrice,
+      sellingPrice: product.sellingPrice,
       quantity: product.quantity
     });
     setEditingId(product._id);
@@ -229,7 +269,14 @@ const Product = () => {
 
   // Reset form
   const resetForm = () => {
-    setFormData({ name: '', costPrice: '', quantity: '' });
+    setFormData({ 
+      name: '', 
+      sku: '', 
+      category: '', 
+      costPrice: '', 
+      sellingPrice: '', 
+      quantity: '' 
+    });
     setEditingId(null);
     setError('');
   };
@@ -241,6 +288,11 @@ const Product = () => {
       currency: 'USD',
       minimumFractionDigits: 2
     }).format(amount || 0);
+  };
+
+  // Format percentage
+  const formatPercentage = (value) => {
+    return `${parseFloat(value).toFixed(2)}%`;
   };
 
   // Get stock status
@@ -264,11 +316,21 @@ const Product = () => {
     return '🟢';
   };
 
-  // Calculate total value
-  const calculateTotalValue = () => {
-    const costPrice = parseFloat(formData.costPrice) || 0;
-    const quantity = parseFloat(formData.quantity) || 0;
-    return costPrice * quantity;
+  // Calculate product metrics
+  const calculateProductMetrics = (product) => {
+    const totalValue = product.costPrice * product.quantity;
+    const potentialRevenue = product.sellingPrice * product.quantity;
+    const profitPerUnit = product.sellingPrice - product.costPrice;
+    const profitMargin = ((profitPerUnit) / product.costPrice) * 100;
+    const totalPotentialProfit = profitPerUnit * product.quantity;
+
+    return {
+      totalValue,
+      potentialRevenue,
+      profitPerUnit,
+      profitMargin,
+      totalPotentialProfit
+    };
   };
 
   // Close product modal
@@ -284,21 +346,36 @@ const Product = () => {
     setSelectedProductForStock(null);
   };
 
+  // Calculate form metrics
+  const calculateFormMetrics = () => {
+    const costPrice = parseFloat(formData.costPrice) || 0;
+    const sellingPrice = parseFloat(formData.sellingPrice) || 0;
+    const quantity = parseFloat(formData.quantity) || 0;
+    
+    const totalValue = costPrice * quantity;
+    const profitPerUnit = sellingPrice - costPrice;
+    const profitMargin = costPrice > 0 ? (profitPerUnit / costPrice) * 100 : 0;
+    const totalProfit = profitPerUnit * quantity;
+    
+    return { totalValue, profitPerUnit, profitMargin, totalProfit };
+  };
+
   return (
-    <div className="min-h-screen bg-green-50 p-4 md:p-6">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-4 md:p-6">
       {/* Header */}
-      <div className="">
+      <div className="max-w-7xl mx-auto mb-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between">
           <div>
             <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
-              Products
+              Inventory Management
             </h1>
-            <p className="text-gray-700 text-lg">
+            <p className="text-gray-600 text-lg">
+              Manage your products, stock, and profits
             </p>
           </div>
           <button
             onClick={openAddModal}
-            className="mt-4 md:mt-0 bg-green-500 text-white hover:bg-green-600 px-6 py-3 rounded-xl font-semibold shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1 flex items-center gap-2"
+            className="mt-4 md:mt-0 bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1 flex items-center gap-2"
           >
             <span className="text-xl">+</span> Add New Product
           </button>
@@ -326,30 +403,89 @@ const Product = () => {
         )}
 
         {/* Statistics Dashboard */}
-        
+        {stats && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white p-6 rounded-2xl shadow-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm opacity-90">Total Products</p>
+                  <p className="text-3xl font-bold mt-2">{stats.totalProducts || 0}</p>
+                </div>
+                <span className="text-3xl">📦</span>
+              </div>
+            </div>
+            
+            <div className="bg-gradient-to-r from-emerald-500 to-green-600 text-white p-6 rounded-2xl shadow-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm opacity-90">Inventory Value</p>
+                  <p className="text-3xl font-bold mt-2">{formatCurrency(stats.totalInventoryValue || 0)}</p>
+                </div>
+                <span className="text-3xl">💰</span>
+              </div>
+            </div>
+            
+            <div className="bg-gradient-to-r from-purple-500 to-pink-600 text-white p-6 rounded-2xl shadow-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm opacity-90">Potential Revenue</p>
+                  <p className="text-3xl font-bold mt-2">{formatCurrency(stats.totalPotentialRevenue || 0)}</p>
+                </div>
+                <span className="text-3xl">📈</span>
+              </div>
+            </div>
+            
+            <div className="bg-gradient-to-r from-amber-500 to-orange-600 text-white p-6 rounded-2xl shadow-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm opacity-90">Total Profit</p>
+                  <p className="text-3xl font-bold mt-2">{formatCurrency(stats.totalPotentialProfit || 0)}</p>
+                </div>
+                <span className="text-3xl">💸</span>
+              </div>
+            </div>
+          </div>
+        )}
 
-        {/* Search and Bulk Actions */}
+        {/* Search and Filters */}
         <div className="bg-white rounded-2xl p-6 mb-8 shadow-lg">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="relative flex-1">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <span className="text-gray-400">🔍</span>
+            <div className="flex-1 flex flex-col md:flex-row gap-4">
+              <div className="relative flex-1">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <span className="text-gray-400">🔍</span>
+                </div>
+                <input
+                  type="text"
+                  placeholder="Search products by name, SKU, or category..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                />
               </div>
-              <input
-                type="text"
-                placeholder="Search products by name..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-              />
+              
+              <div className="w-full md:w-48">
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="all">All Categories</option>
+                  {categories.map((category, index) => (
+                    <option key={index} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
             
             {selectedProducts.length > 0 && (
               <button 
                 onClick={handleBulkDelete}
-                className="bg-gradient-to-r from-red-500 to-pink-600 text-white px-6 py-3 rounded-xl font-semibold shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1 flex items-center gap-2"
+                className="bg-gradient-to-r from-red-500 to-pink-600 text-white px-6 py-3 rounded-xl font-semibold shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1 flex items-center gap-2 whitespace-nowrap"
               >
-                <span></span>
+                <span>🗑️</span>
                 Delete Selected ({selectedProducts.length})
               </button>
             )}
@@ -408,19 +544,19 @@ const Product = () => {
                       <span className="text-gray-700 font-semibold"></span>
                     </th>
                     <th className="py-4 px-6 text-left">
-                      <span className="text-gray-700 font-semibold">Product Name</span>
+                      <span className="text-gray-700 font-semibold">Product Details</span>
                     </th>
                     <th className="py-4 px-6 text-left">
-                      <span className="text-gray-700 font-semibold">Cost Price</span>
+                      <span className="text-gray-700 font-semibold">Category</span>
                     </th>
                     <th className="py-4 px-6 text-left">
-                      <span className="text-gray-700 font-semibold">Quantity</span>
+                      <span className="text-gray-700 font-semibold">Pricing</span>
                     </th>
                     <th className="py-4 px-6 text-left">
-                      <span className="text-gray-700 font-semibold">Total Value</span>
+                      <span className="text-gray-700 font-semibold">Stock</span>
                     </th>
                     <th className="py-4 px-6 text-left">
-                      <span className="text-gray-700 font-semibold">Stock Status</span>
+                      <span className="text-gray-700 font-semibold">Profit</span>
                     </th>
                     <th className="py-4 px-6 text-left">
                       <span className="text-gray-700 font-semibold">Actions</span>
@@ -429,7 +565,7 @@ const Product = () => {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {products.map((product) => {
-                    const totalValue = product.costPrice * product.quantity;
+                    const metrics = calculateProductMetrics(product);
                     return (
                       <tr 
                         key={product._id}
@@ -445,61 +581,91 @@ const Product = () => {
                         </td>
                         <td className="py-4 px-6">
                           <div className="flex items-center gap-3">
-                            <div className="">
-                              <span className="text-lg"></span>
+                            <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-cyan-600 rounded-lg flex items-center justify-center text-white">
+                              <span className="text-sm">📦</span>
                             </div>
                             <div>
-                              <span className="font-medium text-gray-800 block">
+                              <span className="font-bold text-gray-800 block">
                                 {product.name}
+                              </span>
+                              <span className="text-sm text-gray-500 font-mono">
+                                SKU: {product.sku}
                               </span>
                             </div>
                           </div>
                         </td>
                         <td className="py-4 px-6">
-                          <span className="font-mono font-bold text-gray-700">
-                            {formatCurrency(product.costPrice)}
+                          <span className="px-3 py-1 bg-gradient-to-r from-purple-100 to-pink-100 text-purple-800 rounded-full text-sm font-medium">
+                            {product.category}
                           </span>
                         </td>
                         <td className="py-4 px-6">
-                          <span className={`px-3 py-1 rounded-full text-sm font-bold ${getStockStatus(product.quantity)}`}>
-                            {product.quantity}
-                          </span>
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-gray-500">Cost:</span>
+                              <span className="font-mono font-medium text-gray-700">
+                                {formatCurrency(product.costPrice)}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-gray-500">Sell:</span>
+                              <span className="font-mono font-medium text-emerald-700">
+                                {formatCurrency(product.sellingPrice)}
+                              </span>
+                            </div>
+                          </div>
                         </td>
                         <td className="py-4 px-6">
-                          <span className="font-mono font-bold text-emerald-700 text-lg">
-                            {formatCurrency(totalValue)}
-                          </span>
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg">{getStockIcon(product.quantity)}</span>
+                              <span className={`px-3 py-1 rounded-full text-sm font-bold ${getStockStatus(product.quantity)}`}>
+                                {product.quantity}
+                              </span>
+                            </div>
+                            <div className="text-sm text-gray-600">
+                              Value: {formatCurrency(metrics.totalValue)}
+                            </div>
+                          </div>
                         </td>
                         <td className="py-4 px-6">
-                          <div className="flex items-center gap-2">
-                            <span>{getStockIcon(product.quantity)}</span>
-                            <span className={`text-sm font-medium ${getStockStatus(product.quantity).replace('bg-', 'text-').replace('100', '800')}`}>
-                              {getStockText(product.quantity)}
-                            </span>
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-gray-500">Margin:</span>
+                              <span className={`font-medium ${metrics.profitMargin >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                                {formatPercentage(metrics.profitMargin)}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-gray-500">Profit:</span>
+                              <span className="font-mono font-medium text-emerald-700">
+                                {formatCurrency(metrics.totalPotentialProfit)}
+                              </span>
+                            </div>
                           </div>
                         </td>
                         <td className="py-4 px-6">
                           <div className="flex gap-2">
                             <button
                               onClick={() => handleEdit(product)}
-                              className="p-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors duration-200"
+                              className="p-2 bg-gradient-to-r from-blue-100 to-cyan-100 text-blue-700 rounded-lg hover:from-blue-200 hover:to-cyan-200 transition-all duration-200"
                               title="Edit"
                             >
-                              edit
+                              ✏️
                             </button>
                             <button
                               onClick={() => handleStockUpdateClick(product)}
-                              className="p-2 bg-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-200 transition-colors duration-200"
+                              className="p-2 bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 rounded-lg hover:from-emerald-200 hover:to-green-200 transition-all duration-200"
                               title="Update Stock"
                             >
                               📈
                             </button>
                             <button
                               onClick={() => handleDelete(product._id)}
-                              className="p-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors duration-200"
+                              className="p-2 bg-gradient-to-r from-red-100 to-pink-100 text-red-700 rounded-lg hover:from-red-200 hover:to-pink-200 transition-all duration-200"
                               title="Delete"
                             >
-                             delete
+                              🗑️
                             </button>
                           </div>
                         </td>
@@ -513,7 +679,9 @@ const Product = () => {
         </div>
 
         {/* Footer */}
-        
+        <div className="mt-8 text-center text-gray-500 text-sm">
+          <p>Total: {products.length} products • Inventory Value: {formatCurrency(stats?.totalInventoryValue || 0)}</p>
+        </div>
       </div>
 
       {/* Product Modal */}
@@ -527,7 +695,7 @@ const Product = () => {
             ></div>
 
             {/* Modal panel */}
-            <div className="inline-block w-full max-w-md p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-2xl">
+            <div className="inline-block w-full max-w-lg p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-2xl">
               {/* Header */}
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-2xl font-bold text-gray-800">
@@ -546,21 +714,53 @@ const Product = () => {
               {/* Form */}
               <form onSubmit={handleSubmit}>
                 <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Product Name *
+                      </label>
+                      <input
+                        type="text"
+                        name="name"
+                        value={formData.name}
+                        onChange={handleInputChange}
+                        placeholder="Enter product name"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                        required
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        SKU *
+                      </label>
+                      <input
+                        type="text"
+                        name="sku"
+                        value={formData.sku}
+                        onChange={handleInputChange}
+                        placeholder="Enter SKU"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 uppercase"
+                        required
+                      />
+                    </div>
+                  </div>
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Product Name *
+                      Category *
                     </label>
                     <input
                       type="text"
-                      name="name"
-                      value={formData.name}
+                      name="category"
+                      value={formData.category}
                       onChange={handleInputChange}
-                      placeholder="Enter product name"
+                      placeholder="Enter category"
                       className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                       required
                     />
                   </div>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -581,29 +781,66 @@ const Product = () => {
                     
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Quantity *
+                        Selling Price ($) *
                       </label>
                       <input
                         type="number"
-                        name="quantity"
-                        value={formData.quantity}
+                        name="sellingPrice"
+                        value={formData.sellingPrice}
                         onChange={handleInputChange}
-                        placeholder="0"
-                        min="0"
+                        placeholder="0.00"
+                        min="0.01"
+                        step="0.01"
                         className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                         required
                       />
                     </div>
                   </div>
 
-                  {/* Calculated Total */}
-                  {formData.costPrice && formData.quantity && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Quantity *
+                    </label>
+                    <input
+                      type="number"
+                      name="quantity"
+                      value={formData.quantity}
+                      onChange={handleInputChange}
+                      placeholder="0"
+                      min="0"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                      required
+                    />
+                  </div>
+
+                  {/* Calculated Metrics */}
+                  {(formData.costPrice || formData.sellingPrice || formData.quantity) && (
                     <div className="bg-gradient-to-r from-blue-50 to-cyan-50 p-4 rounded-xl border border-blue-100">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm font-medium text-gray-600">Total Value:</span>
-                        <span className="text-lg font-bold text-emerald-700">
-                          {formatCurrency(calculateTotalValue())}
-                        </span>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <span className="text-sm font-medium text-gray-600">Total Value:</span>
+                          <p className="text-lg font-bold text-blue-700">
+                            {formatCurrency(calculateFormMetrics().totalValue)}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-sm font-medium text-gray-600">Profit Margin:</span>
+                          <p className={`text-lg font-bold ${calculateFormMetrics().profitMargin >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                            {formatPercentage(calculateFormMetrics().profitMargin)}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-sm font-medium text-gray-600">Profit per Unit:</span>
+                          <p className={`text-lg font-bold ${calculateFormMetrics().profitPerUnit >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                            {formatCurrency(calculateFormMetrics().profitPerUnit)}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-sm font-medium text-gray-600">Total Profit:</span>
+                          <p className={`text-lg font-bold ${calculateFormMetrics().totalProfit >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                            {formatCurrency(calculateFormMetrics().totalProfit)}
+                          </p>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -631,17 +868,15 @@ const Product = () => {
         </div>
       )}
 
-      {/* Stock Update Modal */}
+      {/* Stock Update Modal - Same as before */}
       {showStockModal && selectedProductForStock && (
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-            {/* Background overlay */}
             <div 
-              className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75"
+              className=""
               onClick={closeStockModal}
             ></div>
 
-            {/* Modal panel */}
             <div className="inline-block w-full max-w-md p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-2xl">
               {/* Header */}
               <div className="flex items-center justify-between mb-6">
@@ -666,12 +901,12 @@ const Product = () => {
                   </div>
                   <div>
                     <h4 className="font-bold text-gray-800">{selectedProductForStock.name}</h4>
-                    <div className="flex items-center gap-4 mt-1">
+                    <div className="flex flex-wrap items-center gap-4 mt-1">
                       <span className="text-sm text-gray-600">
-                        Current: <strong>{selectedProductForStock.quantity}</strong>
+                        SKU: <strong>{selectedProductForStock.sku}</strong>
                       </span>
                       <span className="text-sm text-gray-600">
-                        Value: <strong>{formatCurrency(selectedProductForStock.costPrice * selectedProductForStock.quantity)}</strong>
+                        Current: <strong>{selectedProductForStock.quantity}</strong>
                       </span>
                     </div>
                   </div>

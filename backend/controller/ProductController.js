@@ -8,21 +8,21 @@ import Product from "../model/Products.js";
  */
 export const createProduct = async (req, res) => {
   try {
-    const { name, costPrice, quantity } = req.body;
+    const { name, sku, category, costPrice, sellingPrice, quantity } = req.body;
 
     // Validate required fields
-    if (!name || !costPrice || !quantity) {
+    if (!name || !sku || !category || !costPrice || !sellingPrice || !quantity) {
       return res.status(400).json({
         success: false,
-        message: "Name, cost price, and quantity are required"
+        message: "Name, SKU, category, cost price, selling price, and quantity are required"
       });
     }
 
     // Validate numeric fields
-    if (isNaN(costPrice) || isNaN(quantity)) {
+    if (isNaN(costPrice) || isNaN(sellingPrice) || isNaN(quantity)) {
       return res.status(400).json({
         success: false,
-        message: "Cost price and quantity must be numbers"
+        message: "Cost price, selling price, and quantity must be numbers"
       });
     }
 
@@ -33,6 +33,13 @@ export const createProduct = async (req, res) => {
       });
     }
 
+    if (sellingPrice <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Selling price must be greater than 0"
+      });
+    }
+
     if (quantity < 0) {
       return res.status(400).json({
         success: false,
@@ -40,9 +47,26 @@ export const createProduct = async (req, res) => {
       });
     }
 
+    // Validate selling price is greater than or equal to cost price
+    if (parseFloat(sellingPrice) < parseFloat(costPrice)) {
+      return res.status(400).json({
+        success: false,
+        message: "Selling price must be greater than or equal to cost price"
+      });
+    }
+
+    // Check if product with same SKU exists
+    const existingProductBySKU = await Product.findOne({ sku: sku.toUpperCase() });
+    if (existingProductBySKU) {
+      return res.status(409).json({
+        success: false,
+        message: "Product with this SKU already exists"
+      });
+    }
+
     // Check if product with same name exists
-    const existingProduct = await Product.findOne({ name });
-    if (existingProduct) {
+    const existingProductByName = await Product.findOne({ name });
+    if (existingProductByName) {
       return res.status(409).json({
         success: false,
         message: "Product with this name already exists"
@@ -51,19 +75,25 @@ export const createProduct = async (req, res) => {
 
     const product = await Product.create({ 
       name, 
+      sku: sku.toUpperCase(),
+      category,
       costPrice: parseFloat(costPrice), 
+      sellingPrice: parseFloat(sellingPrice),
       quantity: parseInt(quantity)
     });
 
-    // Calculate total value
+    // Calculate total value and profit margin
     const totalValue = product.costPrice * product.quantity;
+    const profitMargin = ((product.sellingPrice - product.costPrice) / product.costPrice) * 100;
 
     res.status(201).json({
       success: true,
       message: "Product created successfully",
       data: {
         ...product._doc,
-        totalValue
+        totalValue,
+        profitMargin: profitMargin.toFixed(2),
+        profitPerUnit: product.sellingPrice - product.costPrice
       }
     });
   } catch (error) {
@@ -93,10 +123,17 @@ export const getAllProducts = async (req, res) => {
     const query = searchQuery
       ? {
           $or: [
-            { name: { $regex: searchQuery, $options: "i" } }
+            { name: { $regex: searchQuery, $options: "i" } },
+            { sku: { $regex: searchQuery, $options: "i" } },
+            { category: { $regex: searchQuery, $options: "i" } }
           ]
         }
       : {};
+
+    // Category filter
+    if (req.query.category) {
+      query.category = req.query.category;
+    }
 
     // Sorting
     const sortField = req.query.sortBy || "createdAt";
@@ -109,32 +146,59 @@ export const getAllProducts = async (req, res) => {
       .skip(skip)
       .limit(limit);
 
-    // Calculate total value for each product
-    const productsWithTotal = products.map(product => ({
-      ...product._doc,
-      totalValue: product.costPrice * product.quantity
-    }));
+    // Calculate additional fields for each product
+    const productsWithCalculations = products.map(product => {
+      const totalValue = product.costPrice * product.quantity;
+      const potentialRevenue = product.sellingPrice * product.quantity;
+      const profitPerUnit = product.sellingPrice - product.costPrice;
+      const profitMargin = ((profitPerUnit) / product.costPrice) * 100;
+      const totalPotentialProfit = profitPerUnit * product.quantity;
+
+      return {
+        ...product._doc,
+        totalValue,
+        potentialRevenue,
+        profitPerUnit,
+        profitMargin: profitMargin.toFixed(2),
+        totalPotentialProfit
+      };
+    });
 
     // Get total count for pagination info
     const total = await Product.countDocuments(query);
 
     // Calculate inventory statistics
-    const totalProductsValue = productsWithTotal.reduce((sum, product) => 
+    const totalProductsValue = productsWithCalculations.reduce((sum, product) => 
       sum + product.totalValue, 0
     );
-    const totalItemsInStock = productsWithTotal.reduce((sum, product) => 
+    const totalItemsInStock = productsWithCalculations.reduce((sum, product) => 
       sum + product.quantity, 0
     );
+    const totalPotentialRevenue = productsWithCalculations.reduce((sum, product) => 
+      sum + product.potentialRevenue, 0
+    );
+    const totalPotentialProfit = productsWithCalculations.reduce((sum, product) => 
+      sum + product.totalPotentialProfit, 0
+    );
+
+    // Get unique categories for filter dropdown
+    const categories = await Product.distinct("category");
 
     res.status(200).json({
       success: true,
       message: "Products retrieved successfully",
-      data: productsWithTotal,
+      data: productsWithCalculations,
+      filters: {
+        categories
+      },
       statistics: {
         totalProducts: total,
         totalProductsValue,
         totalItemsInStock,
-        averageProductValue: totalProductsValue / (productsWithTotal.length || 1)
+        totalPotentialRevenue,
+        totalPotentialProfit,
+        averageProductValue: totalProductsValue / (productsWithCalculations.length || 1),
+        averageProfitMargin: ((totalPotentialProfit / totalProductsValue) * 100).toFixed(2) || "0.00"
       },
       pagination: {
         page,
@@ -179,15 +243,23 @@ export const getProductById = async (req, res) => {
       });
     }
 
-    // Calculate total value
+    // Calculate additional fields
     const totalValue = product.costPrice * product.quantity;
+    const potentialRevenue = product.sellingPrice * product.quantity;
+    const profitPerUnit = product.sellingPrice - product.costPrice;
+    const profitMargin = ((profitPerUnit) / product.costPrice) * 100;
+    const totalPotentialProfit = profitPerUnit * product.quantity;
 
     res.status(200).json({
       success: true,
       message: "Product retrieved successfully",
       data: {
         ...product._doc,
-        totalValue
+        totalValue,
+        potentialRevenue,
+        profitPerUnit,
+        profitMargin: profitMargin.toFixed(2),
+        totalPotentialProfit
       }
     });
   } catch (error) {
@@ -208,7 +280,7 @@ export const getProductById = async (req, res) => {
 export const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, costPrice, quantity } = req.body;
+    const { name, sku, category, costPrice, sellingPrice, quantity } = req.body;
 
     // Validate MongoDB ID
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -235,11 +307,42 @@ export const updateProduct = async (req, res) => {
       });
     }
 
-    if (quantity && (isNaN(quantity) || quantity < 0)) {
+    if (sellingPrice && (isNaN(sellingPrice) || sellingPrice <= 0)) {
+      return res.status(400).json({
+        success: false,
+        message: "Selling price must be a number greater than 0"
+      });
+    }
+
+    if (quantity !== undefined && (isNaN(quantity) || quantity < 0)) {
       return res.status(400).json({
         success: false,
         message: "Quantity cannot be negative"
       });
+    }
+
+    // Validate selling price is greater than or equal to cost price
+    const finalCostPrice = costPrice || existingProduct.costPrice;
+    const finalSellingPrice = sellingPrice || existingProduct.sellingPrice;
+    if (parseFloat(finalSellingPrice) < parseFloat(finalCostPrice)) {
+      return res.status(400).json({
+        success: false,
+        message: "Selling price must be greater than or equal to cost price"
+      });
+    }
+
+    // Check if SKU is being updated and if it already exists
+    if (sku && sku.toUpperCase() !== existingProduct.sku) {
+      const skuExists = await Product.findOne({ 
+        sku: sku.toUpperCase(), 
+        _id: { $ne: id } 
+      });
+      if (skuExists) {
+        return res.status(409).json({
+          success: false,
+          message: "Another product with this SKU already exists"
+        });
+      }
     }
 
     // Check if name is being updated and if it already exists
@@ -259,7 +362,10 @@ export const updateProduct = async (req, res) => {
     // Update product
     const updateData = {};
     if (name) updateData.name = name;
+    if (sku) updateData.sku = sku.toUpperCase();
+    if (category) updateData.category = category;
     if (costPrice) updateData.costPrice = parseFloat(costPrice);
+    if (sellingPrice) updateData.sellingPrice = parseFloat(sellingPrice);
     if (quantity !== undefined) updateData.quantity = parseInt(quantity);
 
     const updatedProduct = await Product.findByIdAndUpdate(
@@ -268,15 +374,23 @@ export const updateProduct = async (req, res) => {
       { new: true, runValidators: true }
     );
 
-    // Calculate total value
+    // Calculate additional fields
     const totalValue = updatedProduct.costPrice * updatedProduct.quantity;
+    const potentialRevenue = updatedProduct.sellingPrice * updatedProduct.quantity;
+    const profitPerUnit = updatedProduct.sellingPrice - updatedProduct.costPrice;
+    const profitMargin = ((profitPerUnit) / updatedProduct.costPrice) * 100;
+    const totalPotentialProfit = profitPerUnit * updatedProduct.quantity;
 
     res.status(200).json({
       success: true,
       message: "Product updated successfully",
       data: {
         ...updatedProduct._doc,
-        totalValue
+        totalValue,
+        potentialRevenue,
+        profitPerUnit,
+        profitMargin: profitMargin.toFixed(2),
+        totalPotentialProfit
       }
     });
   } catch (error) {
@@ -349,8 +463,12 @@ export const updateProductQuantity = async (req, res) => {
       { new: true, runValidators: true }
     );
 
-    // Calculate total value
+    // Calculate additional fields
     const totalValue = updatedProduct.costPrice * updatedProduct.quantity;
+    const potentialRevenue = updatedProduct.sellingPrice * updatedProduct.quantity;
+    const profitPerUnit = updatedProduct.sellingPrice - updatedProduct.costPrice;
+    const profitMargin = ((profitPerUnit) / updatedProduct.costPrice) * 100;
+    const totalPotentialProfit = profitPerUnit * updatedProduct.quantity;
 
     res.status(200).json({
       success: true,
@@ -358,6 +476,10 @@ export const updateProductQuantity = async (req, res) => {
       data: {
         ...updatedProduct._doc,
         totalValue,
+        potentialRevenue,
+        profitPerUnit,
+        profitMargin: profitMargin.toFixed(2),
+        totalPotentialProfit,
         previousQuantity: product.quantity,
         quantityChange: action === 'add' ? parseInt(amount) : -parseInt(amount)
       }
@@ -399,10 +521,22 @@ export const deleteProduct = async (req, res) => {
     }
 
     // Store product info before deletion
+    const totalValue = product.costPrice * product.quantity;
+    const potentialRevenue = product.sellingPrice * product.quantity;
+    const profitPerUnit = product.sellingPrice - product.costPrice;
+    const totalPotentialProfit = profitPerUnit * product.quantity;
+
     const productInfo = {
       name: product.name,
+      sku: product.sku,
+      category: product.category,
       quantity: product.quantity,
-      totalValue: product.costPrice * product.quantity
+      costPrice: product.costPrice,
+      sellingPrice: product.sellingPrice,
+      totalValue,
+      potentialRevenue,
+      profitPerUnit,
+      totalPotentialProfit
     };
 
     // Delete product
@@ -461,6 +595,12 @@ export const bulkDeleteProducts = async (req, res) => {
     const totalQuantity = productsToDelete.reduce((sum, product) => 
       sum + product.quantity, 0
     );
+    const totalPotentialRevenue = productsToDelete.reduce((sum, product) => 
+      sum + (product.sellingPrice * product.quantity), 0
+    );
+    const totalPotentialProfit = productsToDelete.reduce((sum, product) => 
+      sum + ((product.sellingPrice - product.costPrice) * product.quantity), 0
+    );
 
     // Delete products
     const result = await Product.deleteMany({ _id: { $in: ids } });
@@ -478,7 +618,9 @@ export const bulkDeleteProducts = async (req, res) => {
       data: {
         deletedCount: result.deletedCount,
         totalValueDeleted: totalValue,
-        totalQuantityDeleted: totalQuantity
+        totalQuantityDeleted: totalQuantity,
+        totalPotentialRevenueDeleted: totalPotentialRevenue,
+        totalPotentialProfitDeleted: totalPotentialProfit
       }
     });
   } catch (error) {
@@ -507,9 +649,15 @@ export const getProductStats = async (req, res) => {
     const totalItemsInStock = products.reduce((sum, product) => 
       sum + product.quantity, 0
     );
+    const totalPotentialRevenue = products.reduce((sum, product) => 
+      sum + (product.sellingPrice * product.quantity), 0
+    );
+    const totalPotentialProfit = products.reduce((sum, product) => 
+      sum + ((product.sellingPrice - product.costPrice) * product.quantity), 0
+    );
 
     // Low stock products (less than 10 items)
-    const lowStockProducts = await Product.countDocuments({ quantity: { $lt: 10 } });
+    const lowStockProducts = await Product.countDocuments({ quantity: { $lt: 10, $gt: 0 } });
 
     // Out of stock products
     const outOfStockProducts = await Product.countDocuments({ quantity: 0 });
@@ -518,10 +666,33 @@ export const getProductStats = async (req, res) => {
     const mostValuableProducts = await Product.aggregate([
       {
         $addFields: {
-          totalValue: { $multiply: ["$costPrice", "$quantity"] }
+          totalValue: { $multiply: ["$costPrice", "$quantity"] },
+          potentialRevenue: { $multiply: ["$sellingPrice", "$quantity"] },
+          profitPerUnit: { $subtract: ["$sellingPrice", "$costPrice"] }
+        }
+      },
+      {
+        $addFields: {
+          totalProfit: { $multiply: ["$profitPerUnit", "$quantity"] }
         }
       },
       { $sort: { totalValue: -1 } },
+      { $limit: 5 }
+    ]);
+
+    // Highest profit margin products
+    const highestMarginProducts = await Product.aggregate([
+      {
+        $addFields: {
+          profitMargin: {
+            $multiply: [
+              { $divide: [{ $subtract: ["$sellingPrice", "$costPrice"] }, "$costPrice"] },
+              100
+            ]
+          }
+        }
+      },
+      { $sort: { profitMargin: -1 } },
       { $limit: 5 }
     ]);
 
@@ -532,6 +703,19 @@ export const getProductStats = async (req, res) => {
       createdAt: { $gte: today }
     });
 
+    // Category statistics
+    const categoryStats = await Product.aggregate([
+      {
+        $group: {
+          _id: "$category",
+          count: { $sum: 1 },
+          totalQuantity: { $sum: "$quantity" },
+          totalValue: { $sum: { $multiply: ["$costPrice", "$quantity"] } }
+        }
+      },
+      { $sort: { count: -1 } }
+    ]);
+
     res.status(200).json({
       success: true,
       message: "Product statistics retrieved successfully",
@@ -539,19 +723,108 @@ export const getProductStats = async (req, res) => {
         totalProducts,
         totalInventoryValue,
         totalItemsInStock,
+        totalPotentialRevenue,
+        totalPotentialProfit,
         averageProductValue: totalInventoryValue / (totalProducts || 1),
+        averageProfitMargin: ((totalPotentialProfit / totalInventoryValue) * 100).toFixed(2) || "0.00",
         lowStockProducts,
         outOfStockProducts,
         newToday,
         mostValuableProducts: mostValuableProducts.map(product => ({
           name: product.name,
+          sku: product.sku,
+          category: product.category,
           totalValue: product.totalValue,
+          potentialRevenue: product.potentialRevenue,
+          totalProfit: product.totalProfit,
           quantity: product.quantity
-        }))
+        })),
+        highestMarginProducts: highestMarginProducts.map(product => ({
+          name: product.name,
+          sku: product.sku,
+          category: product.category,
+          profitMargin: product.profitMargin.toFixed(2),
+          costPrice: product.costPrice,
+          sellingPrice: product.sellingPrice
+        })),
+        categoryStats
       }
     });
   } catch (error) {
     console.error("Get Product Stats Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message
+    });
+  }
+};
+
+/**
+ * @desc    Get products by category
+ * @route   GET /api/products/category/:category
+ * @access  Public
+ */
+export const getProductsByCategory = async (req, res) => {
+  try {
+    const { category } = req.params;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const query = { category: { $regex: new RegExp(category, 'i') } };
+
+    const products = await Product.find(query)
+      .skip(skip)
+      .limit(limit);
+
+    const total = await Product.countDocuments(query);
+
+    const productsWithCalculations = products.map(product => {
+      const totalValue = product.costPrice * product.quantity;
+      const potentialRevenue = product.sellingPrice * product.quantity;
+      const profitPerUnit = product.sellingPrice - product.costPrice;
+      const profitMargin = ((profitPerUnit) / product.costPrice) * 100;
+      const totalPotentialProfit = profitPerUnit * product.quantity;
+
+      return {
+        ...product._doc,
+        totalValue,
+        potentialRevenue,
+        profitPerUnit,
+        profitMargin: profitMargin.toFixed(2),
+        totalPotentialProfit
+      };
+    });
+
+    // Category statistics
+    const categoryStats = await Product.aggregate([
+      { $match: query },
+      {
+        $group: {
+          _id: "$category",
+          totalProducts: { $sum: 1 },
+          totalQuantity: { $sum: "$quantity" },
+          totalInventoryValue: { $sum: { $multiply: ["$costPrice", "$quantity"] } },
+          totalPotentialRevenue: { $sum: { $multiply: ["$sellingPrice", "$quantity"] } }
+        }
+      }
+    ]);
+
+    res.status(200).json({
+      success: true,
+      message: `Products in category '${category}' retrieved successfully`,
+      data: productsWithCalculations,
+      categoryStats: categoryStats[0] || {},
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit)
+      }
+    });
+  } catch (error) {
+    console.error("Get Products By Category Error:", error);
     res.status(500).json({
       success: false,
       message: "Server error",
