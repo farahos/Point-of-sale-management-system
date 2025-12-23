@@ -1,34 +1,36 @@
-import express from "express";
-const router = express.Router();
+// routes/repairRoutes.js
+import express from 'express';
 import {
   getRepairs,
   getRepairById,
-    createRepair,
-    updateRepair,
-    deleteRepair,
-    getRepairStats,
-    searchRepairs
-} from "../controller/repairController.js";
+  createRepair,
+  updateRepair,
+  deleteRepair,
+  bulkDeleteRepairs,
+  updateRepairStatus,
+  getRepairStats,
+  searchRepairs
+} from '../controller/repairController.js';
 
-// GET all repairs
-router.get("/", getRepairs);
+const router = express.Router();
 
-// GET repair stats
-router.get("/stats/summary", getRepairStats);
+router.route('/')
+  .get(getRepairs)
+  .post(createRepair)
+  .delete(bulkDeleteRepairs);
 
-// GET search repairs
-router.get("/search/:query", searchRepairs);
+router.route('/search')
+  .get(searchRepairs);
 
-// GET single repair
-router.get("/:id", getRepairById);
+router.route('/stats/summary')
+  .get(getRepairStats);
 
-// POST create new repair
-router.post("/", createRepair);
+router.route('/:id')
+  .get(getRepairById)
+  .put(updateRepair)
+  .delete(deleteRepair);
 
-// PUT update repair
-router.put("/:id", updateRepair);
-
-// DELETE repair
-router.delete("/:id", deleteRepair);
+router.route('/:id/status')
+  .patch(updateRepairStatus);
 
 export default router;

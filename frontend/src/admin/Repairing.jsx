@@ -1,582 +1,965 @@
-import React, { useEffect, useState } from "react";
-import axios from "axios";
-import jsPDF from "jspdf";
-import { X, Search, Edit, Trash2, FileText, Check, AlertCircle } from "lucide-react";
-
-const API_URL = "https://backendapp-qtb2.onrender.com/api/repairs";
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 
 const Repair = () => {
   const [repairs, setRepairs] = useState([]);
-  const [search, setSearch] = useState("");
-  const [editingId, setEditingId] = useState(null);
-  const [notification, setNotification] = useState({ show: false, message: "", type: "" });
-
-  const [form, setForm] = useState({
-    name: "",
-    phone: "",
-    model: "",
-    color: "",
-    problem: "",
-    caseIncluded: "",
-    battery: "",
-    agreedPrice: "",
-    paid: "",
-    remaining: ""
+  const [products, setProducts] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [formData, setFormData] = useState({
+    productId: '',
+    customerId: '',
+    problem: '',
+    color: '',
+    caseIncluded: '',
+    battery: '',
+    repairCost: '',
+    amountPaid: '',
+    repairStatus: 'pending' // pending, in_progress, completed
   });
+  const [filters, setFilters] = useState({
+    startDate: '',
+    endDate: '',
+    status: ''
+  });
+  const [editingId, setEditingId] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [loadingProducts, setLoadingProducts] = useState(true);
+  const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+  const [selectedRepairs, setSelectedRepairs] = useState([]);
+  const [showRepairModal, setShowRepairModal] = useState(false);
+  const [modalTitle, setModalTitle] = useState('New Repair');
+  
+  const API_URL = '/api/repairs';
 
-  // Show notification
-  const showNotification = (message, type = "success") => {
-    setNotification({ show: true, message, type });
-    setTimeout(() => {
-      setNotification({ show: false, message: "", type: "" });
-    }, 3000);
-  };
-
-  // Fetch
-  const fetchRepairs = async () => {
-    try {
-      const res = await axios.get(API_URL);
-      setRepairs(res.data);
-    } catch (error) {
-      showNotification("Failed to fetch repairs", "error");
-    }
-  };
-
+  // Fetch initial data
   useEffect(() => {
     fetchRepairs();
+    fetchProducts();
+    fetchCustomers();
   }, []);
 
-  // Change
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    const updated = { ...form, [name]: value };
-
-    if (name === "agreedPrice" || name === "paid") {
-      updated.remaining =
-        Number(updated.agreedPrice || 0) - Number(updated.paid || 0);
+  // Fetch repairs with filters
+  const fetchRepairs = async () => {
+    try {
+      setLoading(true);
+      const params = new URLSearchParams();
+      if (filters.startDate) params.append('startDate', filters.startDate);
+      if (filters.endDate) params.append('endDate', filters.endDate);
+      if (filters.status) params.append('status', filters.status);
+      
+      const response = await axios.get(`${API_URL}?${params}`);
+      setRepairs(response.data.data || []);
+      setError('');
+    } catch (err) {
+      setError('Failed to fetch repairs');
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
-
-    setForm(updated);
   };
 
-  // Submit
+  // Fetch products for dropdown
+  const fetchProducts = async () => {
+    try {
+      setLoadingProducts(true);
+      const response = await axios.get('/api/products');
+      setProducts(response.data.data || []);
+    } catch (err) {
+      console.error('Failed to fetch products:', err);
+    } finally {
+      setLoadingProducts(false);
+    }
+  };
+
+  // Fetch customers for dropdown
+  const fetchCustomers = async () => {
+    try {
+      const response = await axios.get('/api/customers');
+      setCustomers(response.data.data || []);
+    } catch (err) {
+      console.error('Failed to fetch customers:', err);
+    }
+  };
+
+  // Handle form input changes
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData({
+      ...formData,
+      [name]: value
+    });
+
+    // Auto-calculate remaining balance
+    if (name === 'repairCost' || name === 'amountPaid') {
+      const cost = parseFloat(formData.repairCost) || 0;
+      const paid = parseFloat(formData.amountPaid) || 0;
+      setFormData(prev => ({
+        ...prev,
+        remainingBalance: Math.max(0, cost - paid)
+      }));
+    }
+  };
+
+  // Handle filter changes
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters({
+      ...filters,
+      [name]: value
+    });
+  };
+
+  // Apply filters
+  const applyFilters = () => {
+    fetchRepairs();
+  };
+
+  // Clear filters
+  const clearFilters = () => {
+    setFilters({ startDate: '', endDate: '', status: '' });
+    fetchRepairs();
+  };
+
+  // Open Add Repair Modal
+  const openAddModal = () => {
+    resetForm();
+    setModalTitle('New Repair');
+    setShowRepairModal(true);
+  };
+
+  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (!formData.productId || !formData.customerId || !formData.problem || !formData.repairCost) {
+      setError('Required fields: Product, Customer, Problem, and Repair Cost');
+      return;
+    }
 
     try {
+      // First, get the product to check stock
+      const productResponse = await axios.get(`/api/products/${formData.productId}`);
+      const product = productResponse.data.data;
+      
+      if (!product || product.quantity <= 0) {
+        setError('Product is out of stock');
+        return;
+      }
+
+      // Calculate remaining balance
+      const repairCost = parseFloat(formData.repairCost) || 0;
+      const amountPaid = parseFloat(formData.amountPaid) || 0;
+      const remainingBalance = Math.max(0, repairCost - amountPaid);
+
       if (editingId) {
-        await axios.put(`${API_URL}/${editingId}`, form);
-        showNotification("Repair updated successfully!");
+        // Update repair
+        await axios.put(`${API_URL}/${editingId}`, {
+          ...formData,
+          remainingBalance
+        });
+        setSuccessMessage('Repair updated successfully!');
       } else {
-        await axios.post(API_URL, form);
-        showNotification("Repair added successfully!");
-      }
-
-      resetForm();
-      fetchRepairs();
-    } catch (error) {
-      showNotification("Failed to save repair", "error");
-    }
-  };
-
-  const resetForm = () => {
-    setForm({
-      name: "",
-      phone: "",
-      model: "",
-      color: "",
-      problem: "",
-      caseIncluded: "",
-      battery: "",
-      agreedPrice: "",
-      paid: "",
-      remaining: ""
-    });
-    setEditingId(null);
-  };
-
-  // Edit
-  const handleEdit = (repair) => {
-    setForm(repair);
-    setEditingId(repair._id);
-    showNotification("Editing repair entry", "info");
-  };
-
-  // Delete
-  const handleDelete = async (id) => {
-    if (window.confirm("Are you sure you want to delete this repair?")) {
-      try {
-        await axios.delete(`${API_URL}/${id}`);
-        fetchRepairs();
-        showNotification("Repair deleted successfully!");
-      } catch (error) {
-        showNotification("Failed to delete repair", "error");
-      }
-    }
-  };
-
-const printInvoice = (r) => {
-  try {
-    // Dynamically import jsPDF and the AutoTable plugin[citation:2][citation:5]
-    import('jspdf').then((jsPDF) => {
-      import('jspdf-autotable').then((autoTable) => {
-        const doc = new jsPDF.default();
-
-        // === 1. COMPANY HEADER & BRANDING ===
-        doc.setFontSize(20);
-        doc.setTextColor(34, 197, 94); // Green brand color
-        doc.text(" MOBILE REPAIR SHOP", 105, 20, null, null, 'center');
-
-        doc.setFontSize(10);
-        doc.setTextColor(0, 0, 0);
-        doc.text("Phone: (123) 456-7890 | Address: Mogadishu Somalia", 105, 26, null, null, 'center');
-
-        // === 2. INVOICE METADATA (Auto-generated) ===
-        doc.setFontSize(10);
-        const currentDate = new Date();
-        const invoiceNumber = `INV-${Math.floor(1000 + Math.random() * 9000)}/${currentDate.getFullYear()}`;
-        const formattedDate = currentDate.toLocaleDateString('en-US', { 
-          year: 'numeric', 
-          month: 'short', 
-          day: 'numeric' 
+        // Create repair AND decrement product stock
+        const repairResponse = await axios.post(API_URL, {
+          ...formData,
+          remainingBalance
         });
         
-        // Left-aligned: Invoice number[citation:4]
-        // Right-aligned: Date[citation:4]
-        doc.text(`Invoice #: ${invoiceNumber}`, 14, 32);
-        doc.text(`Date: ${formattedDate}`, 196, 32, null, null, 'right');
-
-        // Decorative line[citation:4]
-        doc.setDrawColor(34, 197, 94);
-        doc.setLineWidth(0.5);
-        doc.line(14, 34, 196, 34);
-
-        // === 3. DOCUMENT TITLE ===
-        doc.setFontSize(16);
-        doc.setTextColor(0, 0, 0);
-        doc.text(`Repair Invoice for ${r.name}`, 105, 40, null, null, 'center');
-
-        // === 4. KEY CUSTOMER & JOB DETAILS ===
-        // Use AutoTable for a clean, structured layout[citation:2][citation:5]
-        const customerDetails = [
-          ['Customer Name', r.name],
-          ['Contact Phone', r.phone],
-          ['Device Model', r.model],
-          ['Device Color', r.color],
-          ['Problem Description', r.problem]
-        ];
-
-        autoTable.default(doc, {
-          body: customerDetails,
-          startY: 45,
-          theme: 'plain', // No grid for a clean look
-          styles: { fontSize: 11, cellPadding: 5 },
-          columnStyles: {
-            0: { fontStyle: 'bold', cellWidth: 60 },
-            1: { cellWidth: 'auto' }
-          },
-          margin: { left: 14 }
+        // Decrement product quantity by 1 (like sales)
+        await axios.put(`/api/products/${formData.productId}`, {
+          quantity: product.quantity - 1
         });
+        
+        setSuccessMessage('Repair created and product stock updated successfully!');
+      }
+      
+      // Reset and refresh
+      resetForm();
+      fetchRepairs();
+      fetchProducts(); // Refresh products to update stock display
+      setShowRepairModal(false);
+      
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Operation failed');
+    }
+  };
 
-        // === 5. SERVICE & CONDITION CHECKLIST ===
-        const conditionTableData = [
-          ['Case Included?', r.caseIncluded],
-          ['Battery Health', r.battery]
-        ];
-
-        autoTable.default(doc, {
-          body: conditionTableData,
-          startY: doc.lastAutoTable.finalY + 10,
-          theme: 'plain',
-          styles: { fontSize: 11, cellPadding: 5 },
-          columnStyles: {
-            0: { fontStyle: 'bold', cellWidth: 60 },
-            1: { cellWidth: 'auto' }
-          },
-          margin: { left: 14 }
-        });
-
-        // === 6. FINANCIAL SUMMARY TABLE ===
-        const financialData = [
-          ['Agreed Repair Price', `$${r.agreedPrice}`],
-          ['Amount Paid to Date', `$${r.paid}`],
-          ['Remaining Balance', `$${r.remaining}`]
-        ];
-
-        autoTable.default(doc, {
-          body: financialData,
-          startY: doc.lastAutoTable.finalY + 10,
-          theme: 'grid', // Use a grid to highlight financial figures[citation:5]
-          styles: { fontSize: 11, cellPadding: 6, halign: 'right' },
-          headStyles: { fillColor: [34, 197, 94], textColor: 255 }, // Green header
-          columnStyles: {
-            0: { fontStyle: 'bold', halign: 'left' } // Left-align the label
-          },
-          margin: { left: 14, right: 14 }
-        });
-
-        // === 7. FOOTER WITH NOTES & SIGNATURE[citation:4] ===
-        const finalY = doc.lastAutoTable.finalY + 20;
-        doc.setFontSize(10);
-        doc.setTextColor(100); // Gray color
-        doc.text("Notes: Warranty valid for 30 days on parts and labor. Please retain this invoice.", 14, finalY);
-        doc.text("Customer Signature: __________________________", 14, finalY + 10);
-        doc.text("Authorized by: __________________________", 14, finalY + 20);
-
-        // === 8. PAGE FOOTER (Branding on all pages) ===
-        const pageCount = doc.internal.pages.length-1;
-        for (let i = 1; i <= pageCount; i++) {
-          doc.setPage(i);
-          doc.setFontSize(8);
-          doc.setTextColor(150);
-          doc.text(`© ${currentDate.getFullYear()} Mobile Repair Shop. Invoice ${invoiceNumber}`, 105, 290, null, null, 'center');
-        }
-
-        // === 9. SAVE THE PDF ===
-        doc.save(`invoice-${r.name.replace(/\s+/g, '_')}-${formattedDate.replace(/\s+/g, '_')}.pdf`);
-        showNotification("Professional invoice generated successfully!");
-      });
-    }).catch((error) => {
-      console.error("Failed to load PDF libraries:", error);
-      showNotification("Failed to load PDF generation tools", "error");
+  // Edit repair
+  const handleEdit = (repair) => {
+    setFormData({
+      productId: repair.productId._id || repair.productId,
+      customerId: repair.customerId._id || repair.customerId,
+      problem: repair.problem,
+      color: repair.color || '',
+      caseIncluded: repair.caseIncluded || '',
+      battery: repair.battery || '',
+      repairCost: repair.repairCost,
+      amountPaid: repair.amountPaid || '',
+      repairStatus: repair.repairStatus || 'pending'
     });
-  } catch (error) {
-    console.error("Error in printInvoice:", error);
-    showNotification("Failed to generate invoice", "error");
-  }
-};
-  // Search filter
-  const filteredRepairs = repairs.filter(
-    (r) =>
-      r.name.toLowerCase().includes(search.toLowerCase()) ||
-      r.phone.includes(search)
-  );
+    setEditingId(repair._id);
+    setModalTitle('Edit Repair');
+    setShowRepairModal(true);
+  };
+
+  // Delete repair
+  const handleDelete = async (id) => {
+    if (window.confirm('Are you sure you want to delete this repair?')) {
+      try {
+        await axios.delete(`${API_URL}/${id}`);
+        setSuccessMessage('Repair deleted successfully!');
+        fetchRepairs();
+        setTimeout(() => setSuccessMessage(''), 3000);
+      } catch (err) {
+        setError('Failed to delete repair');
+      }
+    }
+  };
+
+  // Update repair status
+  const handleStatusUpdate = async (id, newStatus) => {
+    try {
+      await axios.put(`${API_URL}/${id}`, {
+        repairStatus: newStatus
+      });
+      setSuccessMessage(`Repair status updated to ${newStatus}!`);
+      fetchRepairs();
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (err) {
+      setError('Failed to update repair status');
+    }
+  };
+
+  // Bulk delete
+  const handleBulkDelete = async () => {
+    if (selectedRepairs.length === 0) {
+      setError('Please select repairs to delete');
+      return;
+    }
+
+    if (window.confirm(`Are you sure you want to delete ${selectedRepairs.length} repair(s)?`)) {
+      try {
+        await axios.delete(API_URL, { data: { ids: selectedRepairs } });
+        setSuccessMessage(`${selectedRepairs.length} repair(s) deleted successfully!`);
+        setSelectedRepairs([]);
+        fetchRepairs();
+        setTimeout(() => setSuccessMessage(''), 3000);
+      } catch (err) {
+        setError('Failed to delete repairs');
+      }
+    }
+  };
+
+  // Handle repair selection
+  const handleSelectRepair = (id) => {
+    if (selectedRepairs.includes(id)) {
+      setSelectedRepairs(selectedRepairs.filter(repairId => repairId !== id));
+    } else {
+      setSelectedRepairs([...selectedRepairs, id]);
+    }
+  };
+
+  // Handle select all
+  const handleSelectAll = () => {
+    if (selectedRepairs.length === repairs.length) {
+      setSelectedRepairs([]);
+    } else {
+      setSelectedRepairs(repairs.map(repair => repair._id));
+    }
+  };
+
+  // Reset form
+  const resetForm = () => {
+    setFormData({
+      productId: '',
+      customerId: '',
+      problem: '',
+      color: '',
+      caseIncluded: '',
+      battery: '',
+      repairCost: '',
+      amountPaid: '',
+      repairStatus: 'pending'
+    });
+    setEditingId(null);
+    setError('');
+  };
+
+  // Format currency
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2
+    }).format(amount || 0);
+  };
+
+  // Format date
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  // Get product name by ID
+  const getProductName = (productId) => {
+    if (typeof productId === 'object') return productId.name;
+    const product = products.find(p => p._id === productId);
+    return product ? product.name : 'Unknown';
+  };
+
+  // Get customer name by ID
+  const getCustomerName = (customerId) => {
+    if (typeof customerId === 'object') return customerId.name;
+    const customer = customers.find(c => c._id === customerId);
+    return customer ? customer.name : 'Unknown';
+  };
+
+  // Get stock for selected product
+  const getAvailableStock = () => {
+    const product = products.find(p => p._id === formData.productId);
+    return product ? product.quantity : 0;
+  };
+
+  // Calculate repair statistics
+  const calculateStats = () => {
+    const totalRevenue = repairs.reduce((sum, repair) => sum + (repair.repairCost || 0), 0);
+    const totalPaid = repairs.reduce((sum, repair) => sum + (repair.amountPaid || 0), 0);
+    const totalBalance = repairs.reduce((sum, repair) => sum + (repair.remainingBalance || 0), 0);
+    
+    const pending = repairs.filter(r => r.repairStatus === 'pending').length;
+    const inProgress = repairs.filter(r => r.repairStatus === 'in_progress').length;
+    const completed = repairs.filter(r => r.repairStatus === 'completed').length;
+    
+    return {
+      totalRevenue,
+      totalPaid,
+      totalBalance,
+      pending,
+      inProgress,
+      completed,
+      totalRepairs: repairs.length
+    };
+  };
+
+  const stats = calculateStats();
+
+  // Close repair modal
+  const closeRepairModal = () => {
+    setShowRepairModal(false);
+    resetForm();
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-white p-4 md:p-6">
-      {/* Notification Popup */}
-      {notification.show && (
-        <div className={`fixed top-4 right-4 z-50 animate-slide-in ${notification.type === "error" ? "bg-red-50 border-red-200 text-red-800" : notification.type === "info" ? "bg-blue-50 border-blue-200 text-blue-800" : "bg-green-50 border-green-200 text-green-800"} border rounded-lg shadow-lg p-4 max-w-sm`}>
-          <div className="flex items-center gap-3">
-            {notification.type === "error" ? (
-              <AlertCircle className="w-5 h-5" />
-            ) : (
-              <Check className="w-5 h-5" />
-            )}
-            <span className="font-medium">{notification.message}</span>
-            <button onClick={() => setNotification({ show: false, message: "", type: "" })} className="ml-auto">
-              <X className="w-4 h-4" />
-            </button>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-cyan-50 p-4 md:p-6">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-blue-500 to-cyan-600 rounded-2xl p-6 md:p-8 mb-8 shadow-lg">
+        <div className="flex flex-col md:flex-row md:items-center justify-between">
+          <div>
+            <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
+              🔧 Repair Management
+            </h1>
+            <p className="text-cyan-100 text-lg">
+              Track repairs, customers, and product stock
+            </p>
+          </div>
+          <button
+            onClick={openAddModal}
+            className="mt-4 md:mt-0 bg-white text-blue-700 hover:bg-blue-50 px-6 py-3 rounded-xl font-semibold shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1 flex items-center gap-2"
+          >
+            <span className="text-xl">+</span> New Repair
+          </button>
+        </div>
+      </div>
+
+      {/* Messages */}
+      <div className="max-w-7xl mx-auto">
+        {successMessage && (
+          <div className="bg-gradient-to-r from-green-400 to-emerald-500 text-white p-4 rounded-xl mb-6 shadow-md animate-fadeIn">
+            <div className="flex items-center gap-3">
+              <span className="text-xl">✅</span>
+              <span className="font-medium">{successMessage}</span>
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="bg-gradient-to-r from-red-400 to-pink-500 text-white p-4 rounded-xl mb-6 shadow-md animate-fadeIn">
+            <div className="flex items-center gap-3">
+              <span className="text-xl">⚠️</span>
+              <span className="font-medium">{error}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Statistics Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white rounded-2xl p-6 shadow-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-blue-100">Total Repairs</p>
+                <p className="text-3xl font-bold mt-2">{stats.totalRepairs}</p>
+              </div>
+              <div className="text-3xl">🔧</div>
+            </div>
+          </div>
+          
+          <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-2xl p-6 shadow-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-green-100">Revenue</p>
+                <p className="text-3xl font-bold mt-2">{formatCurrency(stats.totalRevenue)}</p>
+              </div>
+              <div className="text-3xl">💰</div>
+            </div>
+          </div>
+          
+          <div className="bg-gradient-to-r from-yellow-500 to-amber-600 text-white rounded-2xl p-6 shadow-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-yellow-100">Balance Due</p>
+                <p className="text-3xl font-bold mt-2">{formatCurrency(stats.totalBalance)}</p>
+              </div>
+              <div className="text-3xl">📊</div>
+            </div>
+          </div>
+          
+          <div className="bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-2xl p-6 shadow-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-purple-100">In Progress</p>
+                <p className="text-3xl font-bold mt-2">{stats.inProgress}</p>
+              </div>
+              <div className="text-3xl">⏳</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div className="bg-white rounded-2xl p-6 mb-8 shadow-lg">
+          <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+            <span>🔍</span> Filter Repairs
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Start Date
+              </label>
+              <input
+                type="date"
+                name="startDate"
+                value={filters.startDate}
+                onChange={handleFilterChange}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                End Date
+              </label>
+              <input
+                type="date"
+                name="endDate"
+                value={filters.endDate}
+                onChange={handleFilterChange}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Status
+              </label>
+              <select
+                name="status"
+                value={filters.status}
+                onChange={handleFilterChange}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+              >
+                <option value="">All Status</option>
+                <option value="pending">Pending</option>
+                <option value="in_progress">In Progress</option>
+                <option value="completed">Completed</option>
+              </select>
+            </div>
+            <div className="flex items-end gap-3">
+              <button 
+                onClick={applyFilters}
+                className="flex-1 bg-gradient-to-r from-blue-500 to-cyan-600 text-white py-3 px-6 rounded-xl font-semibold shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1"
+              >
+                Apply Filters
+              </button>
+              <button 
+                onClick={clearFilters}
+                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-all duration-200"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Bulk Actions */}
+        {selectedRepairs.length > 0 && (
+          <div className="bg-gradient-to-r from-red-50 to-pink-50 border border-red-100 rounded-2xl p-4 mb-6 shadow-md">
+            <div className="flex flex-col md:flex-row md:items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="text-red-600 font-bold text-lg">⚠️</span>
+                <div>
+                  <p className="font-medium text-red-800">{selectedRepairs.length} repair(s) selected</p>
+                  <p className="text-sm text-red-600">These actions will affect all selected repairs</p>
+                </div>
+              </div>
+              <button 
+                onClick={handleBulkDelete}
+                className="mt-3 md:mt-0 bg-gradient-to-r from-red-500 to-pink-600 text-white px-6 py-3 rounded-xl font-semibold shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1 flex items-center gap-2"
+              >
+                <span>🗑️</span>
+                Delete Selected
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Repairs List */}
+        <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+          <div className="p-6 border-b border-gray-100">
+            <div className="flex flex-col md:flex-row md:items-center justify-between">
+              <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                <span>📋</span> Repairs List ({repairs.length})
+              </h2>
+              
+              {repairs.length > 0 && (
+                <div className="flex items-center gap-3 mt-4 md:mt-0">
+                  <input
+                    type="checkbox"
+                    id="selectAll"
+                    checked={selectedRepairs.length === repairs.length && repairs.length > 0}
+                    onChange={handleSelectAll}
+                    className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
+                  />
+                  <label htmlFor="selectAll" className="text-gray-600 font-medium">
+                    Select All
+                  </label>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="p-12 text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+              <p className="mt-4 text-gray-600">Loading repairs...</p>
+            </div>
+          ) : repairs.length === 0 ? (
+            <div className="p-12 text-center">
+              <div className="text-6xl mb-4">🔧</div>
+              <p className="text-gray-600 text-lg mb-4">
+                No repairs found. Create your first repair!
+              </p>
+              <button
+                onClick={openAddModal}
+                className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white px-6 py-3 rounded-xl font-semibold shadow-md hover:shadow-lg transition-all duration-200"
+              >
+                + Create First Repair
+              </button>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gradient-to-r from-blue-50 to-cyan-50">
+                  <tr>
+                    <th className="py-4 px-6 text-left">
+                      <span className="text-gray-700 font-semibold"></span>
+                    </th>
+                    <th className="py-4 px-6 text-left">
+                      <span className="text-gray-700 font-semibold">Product</span>
+                    </th>
+                    <th className="py-4 px-6 text-left">
+                      <span className="text-gray-700 font-semibold">Customer</span>
+                    </th>
+                    <th className="py-4 px-6 text-left">
+                      <span className="text-gray-700 font-semibold">Problem</span>
+                    </th>
+                    <th className="py-4 px-6 text-left">
+                      <span className="text-gray-700 font-semibold">Status</span>
+                    </th>
+                    <th className="py-4 px-6 text-left">
+                      <span className="text-gray-700 font-semibold">Cost</span>
+                    </th>
+                    <th className="py-4 px-6 text-left">
+                      <span className="text-gray-700 font-semibold">Paid</span>
+                    </th>
+                    <th className="py-4 px-6 text-left">
+                      <span className="text-gray-700 font-semibold">Balance</span>
+                    </th>
+                    <th className="py-4 px-6 text-left">
+                      <span className="text-gray-700 font-semibold">Date</span>
+                    </th>
+                    <th className="py-4 px-6 text-left">
+                      <span className="text-gray-700 font-semibold">Actions</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {repairs.map((repair) => (
+                    <tr 
+                      key={repair._id}
+                      className="hover:bg-blue-50 transition-colors duration-150"
+                    >
+                      <td className="py-4 px-6">
+                        <input
+                          type="checkbox"
+                          checked={selectedRepairs.includes(repair._id)}
+                          onChange={() => handleSelectRepair(repair._id)}
+                          className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
+                        />
+                      </td>
+                      <td className="py-4 px-6">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-cyan-600 rounded-xl flex items-center justify-center text-white">
+                            <span className="text-lg">📱</span>
+                          </div>
+                          <span className="font-medium text-gray-800">
+                            {getProductName(repair.productId)}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-4 px-6">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-emerald-600 rounded-full flex items-center justify-center text-white text-sm font-bold">
+                            {getCustomerName(repair.customerId).charAt(0).toUpperCase()}
+                          </div>
+                          <span className="text-gray-700">
+                            {getCustomerName(repair.customerId)}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-4 px-6">
+                        <span className="text-gray-700 text-sm">
+                          {repair.problem}
+                        </span>
+                      </td>
+                      <td className="py-4 px-6">
+                        <select
+                          value={repair.repairStatus || 'pending'}
+                          onChange={(e) => handleStatusUpdate(repair._id, e.target.value)}
+                          className={`px-3 py-1 rounded-full text-sm font-bold border ${
+                            repair.repairStatus === 'completed' 
+                              ? 'bg-green-100 text-green-800 border-green-200' 
+                              : repair.repairStatus === 'in_progress'
+                              ? 'bg-yellow-100 text-yellow-800 border-yellow-200'
+                              : 'bg-gray-100 text-gray-800 border-gray-200'
+                          }`}
+                        >
+                          <option value="pending">Pending</option>
+                          <option value="in_progress">In Progress</option>
+                          <option value="completed">Completed</option>
+                        </select>
+                      </td>
+                      <td className="py-4 px-6">
+                        <span className="font-mono font-bold text-gray-800">
+                          {formatCurrency(repair.repairCost)}
+                        </span>
+                      </td>
+                      <td className="py-4 px-6">
+                        <span className="font-mono text-green-700">
+                          {formatCurrency(repair.amountPaid)}
+                        </span>
+                      </td>
+                      <td className="py-4 px-6">
+                        <span className={`font-mono font-bold ${(repair.remainingBalance || 0) > 0 ? 'text-red-700' : 'text-green-700'}`}>
+                          {formatCurrency(repair.remainingBalance)}
+                        </span>
+                      </td>
+                      <td className="py-4 px-6 text-gray-600 text-sm">
+                        {formatDate(repair.createdAt)}
+                      </td>
+                      <td className="py-4 px-6">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleEdit(repair)}
+                            className="p-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors duration-200"
+                            title="Edit"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            onClick={() => handleDelete(repair._id)}
+                            className="p-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors duration-200"
+                            title="Delete"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Repair Modal */}
+      {showRepairModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            {/* Background overlay */}
+            <div 
+              className=""
+              onClick={closeRepairModal}
+            ></div>
+
+            {/* Modal panel */}
+            <div className="inline-block w-full max-w-2xl p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-2xl">
+              {/* Header */}
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-2xl font-bold text-gray-800">
+                  {modalTitle}
+                </h3>
+                <button
+                  onClick={closeRepairModal}
+                  className="p-2 text-gray-400 hover:text-gray-600 transition-colors duration-200"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Form */}
+              <form onSubmit={handleSubmit}>
+                <div className="space-y-6">
+                  {/* Product and Customer Selection */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Product *
+                      </label>
+                      <select
+                        name="productId"
+                        value={formData.productId}
+                        onChange={handleInputChange}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                        required
+                        disabled={loadingProducts}
+                      >
+                        <option value="">Select Product</option>
+                        {products.map(product => (
+                          <option key={product._id} value={product._id}>
+                            {product.name} (Stock: {product.quantity})
+                          </option>
+                        ))}
+                      </select>
+                      {formData.productId && (
+                        <div className="mt-2 text-sm text-blue-600">
+                          Available Stock: <strong>{getAvailableStock()}</strong>
+                          <br />
+                          <span className="text-xs text-gray-500">Stock will decrease by 1 when repair is created</span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Customer *
+                      </label>
+                      <select
+                        name="customerId"
+                        value={formData.customerId}
+                        onChange={handleInputChange}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                        required
+                      >
+                        <option value="">Select Customer</option>
+                        {customers.map(customer => (
+                          <option key={customer._id} value={customer._id}>
+                            {customer.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Repair Details */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Problem Description *
+                      </label>
+                      <input
+                        type="text"
+                        name="problem"
+                        value={formData.problem}
+                        onChange={handleInputChange}
+                        placeholder="e.g., Screen replacement, Battery issue"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                        required
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Color
+                      </label>
+                      <input
+                        type="text"
+                        name="color"
+                        value={formData.color}
+                        onChange={handleInputChange}
+                        placeholder="e.g., Black, White, Blue"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Condition */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Case Included
+                      </label>
+                      <select
+                        name="caseIncluded"
+                        value={formData.caseIncluded}
+                        onChange={handleInputChange}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                      >
+                        <option value="">Select</option>
+                        <option value="Yes">Yes</option>
+                        <option value="No">No</option>
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Battery
+                      </label>
+                      <select
+                        name="battery"
+                        value={formData.battery}
+                        onChange={handleInputChange}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                      >
+                        <option value="">Select</option>
+                        <option value="Good">Good</option>
+                        <option value="Needs Replacement">Needs Replacement</option>
+                        <option value="Dead">Dead</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Financial */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Repair Cost ($) *
+                      </label>
+                      <input
+                        type="number"
+                        name="repairCost"
+                        value={formData.repairCost}
+                        onChange={handleInputChange}
+                        placeholder="0.00"
+                        min="0"
+                        
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                        required
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Amount Paid ($)
+                      </label>
+                      <input
+                        type="number"
+                        name="amountPaid"
+                        value={formData.amountPaid}
+                        onChange={handleInputChange}
+                        placeholder="0.00"
+                        min="0"
+                        
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Balance Due ($)
+                      </label>
+                      <input
+                        type="number"
+                        name="remainingBalance"
+                        value={formData.remainingBalance || 
+                          Math.max(0, (parseFloat(formData.repairCost) || 0) - (parseFloat(formData.amountPaid) || 0))}
+                        readOnly
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-50 font-semibold text-gray-800"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Status */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Repair Status
+                    </label>
+                    <select
+                      name="repairStatus"
+                      value={formData.repairStatus}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                    >
+                      <option value="pending">Pending</option>
+                      <option value="in_progress">In Progress</option>
+                      <option value="completed">Completed</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Form Actions */}
+                <div className="mt-8 flex gap-3">
+                  <button
+                    type="submit"
+                    className="flex-1 bg-gradient-to-r from-blue-500 to-cyan-600 text-white py-3 px-6 rounded-xl font-semibold shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1"
+                  >
+                    {editingId ? 'Update Repair' : 'Create Repair'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={closeRepairModal}
+                    className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-all duration-200"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}
 
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6 border border-green-100">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-3">
-                <div className="p-2 bg-gradient-to-r from-green-500 to-emerald-600 rounded-lg">
-                  <span className="text-white">📱</span>
-                </div>
-                Repair Management System
-              </h1>
-              <p className="text-gray-600 mt-2">Track and manage all phone repair orders</p>
-            </div>
-            
-            <div className="relative w-full md:w-auto">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Search className="h-5 w-5 text-gray-400" />
-              </div>
-              <input
-                placeholder="Search by name or phone..."
-                className="pl-10 pr-4 py-3 w-full md:w-64 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition-all"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {/* Form */}
-          <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl p-6 border border-green-200">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              {editingId ? (
-                <>
-                  <Edit className="w-5 h-5 text-green-600" />
-                  Edit Repair Order
-                </>
-              ) : (
-                <>
-                  <span className="text-green-600">+</span>
-                  New Repair Order
-                </>
-              )}
-            </h2>
-            
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">Customer Name *</label>
-                  <input
-                    name="name"
-                    value={form.name}
-                    onChange={handleChange}
-                    placeholder="John Doe"
-                    required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition-all"
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">Phone Number *</label>
-                  <input
-                    name="phone"
-                    value={form.phone}
-                    onChange={handleChange}
-                    placeholder="+1234567890"
-                    required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition-all"
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">Phone Model *</label>
-                  <input
-                    name="model"
-                    value={form.model}
-                    onChange={handleChange}
-                    placeholder="iPhone 14 Pro"
-                    required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition-all"
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">Color</label>
-                  <input
-                    name="color"
-                    value={form.color}
-                    onChange={handleChange}
-                    placeholder="Space Black"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition-all"
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">Problem Description *</label>
-                  <input
-                    name="problem"
-                    value={form.problem}
-                    onChange={handleChange}
-                    placeholder="Screen replacement"
-                    required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition-all"
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">Case Included</label>
-                  <select
-                    name="caseIncluded"
-                    value={form.caseIncluded}
-                    onChange={handleChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition-all"
-                  >
-                    <option value="">Select</option>
-                    <option value="Yes">Yes</option>
-                    <option value="No">No</option>
-                  </select>
-                </div>
-                
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">Battery</label>
-                  <select
-                    name="battery"
-                    value={form.battery}
-                    onChange={handleChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition-all"
-                  >
-                    <option value="">Select</option>
-                    <option value="Yes">Yes</option>
-                    <option value="No">No</option>
-                  </select>
-                </div>
-                
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">Agreed Price ($) *</label>
-                  <input
-                    type="number"
-                    name="agreedPrice"
-                    value={form.agreedPrice}
-                    onChange={handleChange}
-                    placeholder="0.00"
-                    required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition-all"
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">Amount Paid ($)</label>
-                  <input
-                    type="number"
-                    name="paid"
-                    value={form.paid}
-                    onChange={handleChange}
-                    placeholder="0.00"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition-all"
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">Remaining Balance ($)</label>
-                  <input
-                    name="remaining"
-                    value={form.remaining}
-                    readOnly
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-50 font-semibold text-gray-800"
-                  />
-                </div>
-              </div>
-              
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="submit"
-                  className="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-semibold rounded-xl hover:from-green-600 hover:to-emerald-700 transition-all duration-300 shadow-md hover:shadow-lg flex items-center gap-2"
-                >
-                  <Check className="w-5 h-5" />
-                  {editingId ? "Update Repair" : "Save Repair"}
-                </button>
-                
-                {editingId && (
-                  <button
-                    type="button"
-                    onClick={resetForm}
-                    className="px-6 py-3 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-all duration-300 border border-gray-300"
-                  >
-                    Cancel Edit
-                  </button>
-                )}
-              </div>
-            </form>
-          </div>
-        </div>
-
-        {/* Repairs Table */}
-        <div className="bg-white rounded-2xl shadow-lg overflow-hidden border border-green-100">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <div className="flex justify-between items-center">
-              <h3 className="text-lg font-semibold text-gray-800">Repair Orders ({filteredRepairs.length})</h3>
-              <div className="text-sm text-gray-600">
-                Total Balance: ${filteredRepairs.reduce((sum, r) => sum + (parseFloat(r.remaining) || 0), 0).toFixed(2)}
-              </div>
-            </div>
-          </div>
-          
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gradient-to-r from-green-50 to-emerald-50">
-                <tr>
-                  <th className="py-4 px-6 text-left text-sm font-semibold text-gray-700">Customer</th>
-                  <th className="py-4 px-6 text-left text-sm font-semibold text-gray-700">Phone</th>
-                  <th className="py-4 px-6 text-left text-sm font-semibold text-gray-700">Model</th>
-                  <th className="py-4 px-6 text-left text-sm font-semibold text-gray-700">Agreed</th>
-                  <th className="py-4 px-6 text-left text-sm font-semibold text-gray-700">Paid</th>
-                  <th className="py-4 px-6 text-left text-sm font-semibold text-gray-700">Remain</th>
-                  <th className="py-4 px-6 text-left text-sm font-semibold text-gray-700">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {filteredRepairs.map((r) => (
-                  <tr key={r._id} className="hover:bg-green-50 transition-colors">
-                    <td className="py-4 px-6">
-                      <div>
-                        <div className="font-medium text-gray-900">{r.name}</div>
-                        <div className="text-sm text-gray-500">{r.color}</div>
-                      </div>
-                    </td>
-                    <td className="py-4 px-6">
-                      <div className="text-gray-700">{r.phone}</div>
-                    </td>
-                    <td className="py-4 px-6">
-                      <div className="font-medium text-gray-900">{r.model}</div>
-                      <div className="text-sm text-gray-500">{r.problem}</div>
-                    </td>
-                    <td className="py-4 px-6">
-                      <span className="font-bold text-gray-900">${parseFloat(r.agreedPrice).toFixed(2)}</span>
-                    </td>
-                    <td className="py-4 px-6">
-                      <span className="font-medium text-green-600">${parseFloat(r.paid).toFixed(2)}</span>
-                    </td>
-                    <td className="py-4 px-6">
-                      <span className={`font-bold ${parseFloat(r.remaining) > 0 ? "text-red-600" : "text-green-600"}`}>
-                        ${parseFloat(r.remaining).toFixed(2)}
-                      </span>
-                    </td>
-                    <td className="py-4 px-6">
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleEdit(r)}
-                          className="p-2 bg-yellow-50 text-yellow-600 rounded-lg hover:bg-yellow-100 transition-colors border border-yellow-200"
-                          title="Edit"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(r._id)}
-                          className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors border border-red-200"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => printInvoice(r)}
-                          className="p-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors border border-green-200"
-                          title="Generate Invoice"
-                        >
-                          <FileText className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            
-            {filteredRepairs.length === 0 && (
-              <div className="text-center py-12">
-                <div className="text-gray-400 mb-2">
-                  <Search className="w-12 h-12 mx-auto" />
-                </div>
-                <p className="text-gray-500">No repair orders found</p>
-                {search && (
-                  <button
-                    onClick={() => setSearch("")}
-                    className="mt-2 text-sm text-green-600 hover:text-green-700"
-                  >
-                    Clear search
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
       {/* Add custom animations */}
       <style jsx>{`
-        @keyframes slide-in {
+        @keyframes fadeIn {
           from {
-            transform: translateX(100%);
             opacity: 0;
+            transform: translateY(-10px);
           }
           to {
-            transform: translateX(0);
             opacity: 1;
+            transform: translateY(0);
           }
         }
-        .animate-slide-in {
-          animation: slide-in 0.3s ease-out;
+        .animate-fadeIn {
+          animation: fadeIn 0.3s ease;
         }
       `}</style>
     </div>
