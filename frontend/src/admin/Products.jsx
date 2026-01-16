@@ -29,7 +29,7 @@ const Product = () => {
   const [modalTitle, setModalTitle] = useState('Add New Product');
   const [selectedCategory, setSelectedCategory] = useState('all');
   
-  const API_URL = 'https://backendapp-qtb2.onrender.com/api/products';
+  const API_URL = '/api/products';
 
   // Fetch all products
   const fetchProducts = async () => {

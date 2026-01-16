@@ -41,7 +41,7 @@ const Login = () => {
         setLoading(true);
         
         try {
-            const { data } = await axios.post('https://backendapp-qtb2.onrender.com/api/user/loginuser', form, { withCredentials: true });
+            const { data } = await axios.post('/api/user/loginuser', form, { withCredentials: true });
             console.log(data.role);
             toast.success("Login successful!");
             

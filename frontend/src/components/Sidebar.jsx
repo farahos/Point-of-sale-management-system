@@ -40,8 +40,10 @@ const Sidebar = () => {
      { path: "/customers", icon: Users, label: "Customers" },
     { path: "/products", icon: Package, label: "Products" },
      { path: "/sales", icon: ShoppingBag, label: "Sales" },
-    // { path: "/debt", icon: CreditCard, label: "Debts" },
-     { path: "/Repairing", icon: UserCheck, label: "Repairing" },
+     { path: "/debt", icon: CreditCard, label: "Debts" },
+     { path: "/expense", icon: UserCheck, label: "expense" },
+     { path: "/reports", icon: LayoutDashboard, label: "Reports" },
+     { path: "/users", icon: UserCheck, label: "Users" },
   ];
 
   return (

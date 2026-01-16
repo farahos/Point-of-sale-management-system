@@ -1,19 +1,19 @@
-import express from "express";
+import express from 'express';
 import {
-  createDebt,
-  getDebts,
-  getCustomerDebts,
-  payDebt,
-  quickCreateCustomer,
-} from "../controller/DebtController.js";
+  addTransaction,
+  getAllDebts,
+  getDebt
+} from '../controller/DebtController.js';
 
 const router = express.Router();
 
-router.post("/", createDebt);
-router.get("/", getDebts);
-router.get("/customer/:id", getCustomerDebts);
-router.put("/pay/:id", payDebt);
-router.post("/quick-create", quickCreateCustomer);
+// Add transaction to customer's debt
+router.post('/:customerId/transactions', addTransaction);
 
+// Get all debts
+router.get('/', getAllDebts);
+
+// Get debt for specific customer
+router.get('/:customerId', getDebt);
 
 export default router;

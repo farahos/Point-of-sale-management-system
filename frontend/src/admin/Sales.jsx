@@ -24,7 +24,7 @@ const Sales = () => {
   const [showSaleModal, setShowSaleModal] = useState(false);
   const [modalTitle, setModalTitle] = useState('New Sale');
   
-  const API_URL = 'https://backendapp-qtb2.onrender.com/api/sales';
+  const API_URL = '/api/sales';
 
   // Fetch initial data
   useEffect(() => {
@@ -56,7 +56,7 @@ const Sales = () => {
   const fetchProducts = async () => {
     try {
       setLoadingProducts(true);
-      const response = await axios.get('https://backendapp-qtb2.onrender.com/api/products');
+      const response = await axios.get('/api/products');
       setProducts(response.data.data || []);
     } catch (err) {
       console.error('Failed to fetch products:', err);
@@ -68,7 +68,7 @@ const Sales = () => {
   // Fetch customers for dropdown
   const fetchCustomers = async () => {
     try {
-      const response = await axios.get('https://backendapp-qtb2.onrender.com/api/customers');
+      const response = await axios.get('/api/customers');
       setCustomers(response.data.data || []);
     } catch (err) {
       console.error('Failed to fetch customers:', err);

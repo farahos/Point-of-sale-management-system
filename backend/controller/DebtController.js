@@ -1,109 +1,79 @@
-import Debt from "../model/Debt.js";
+import Debt from '../model/Debt.js';
+import Customer from '../model/Customers.js';
 
-// CREATE OR UPDATE DEBT
-export const createDebt = async (req, res) => {
+// Create or update debt for customer
+export const addTransaction = async (req, res) => {
   try {
-    const { customer, amount, note } = req.body;
-
-    // 1. Check if customer already has a debt
-    let debt = await Debt.findOne({ customer });
-
-    if (debt) {
-      // Update existing debt
-      debt.amount += amount; // add new amount to old
-      debt.note = note || debt.note;
-      if (debt.paidAmount > debt.amount) debt.paidAmount = debt.amount; // safety
-      if (debt.paidAmount === debt.amount) debt.status = "paid";
-      else debt.status = "unpaid";
-      await debt.save();
-
-      return res.status(200).json({ message: "Debt updated successfully", debt });
+    const { customerId } = req.params;
+    const { description, amount, type } = req.body;
+    
+    // Check if customer exists
+    const customer = await Customer.findById(customerId);
+    if (!customer) {
+      return res.status(404).json({ message: 'Macmiil lama helin' });
     }
-
-    // No existing debt → create new
-    debt = await Debt.create({
-      customer,
-      amount,
-      note,
-    });
-
-    res.status(201).json({ message: "Debt created successfully", debt });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
-
-// GET ALL DEBTS
-export const getDebts = async (req, res) => {
-  try {
-    const debts = await Debt.find().populate("customer");
-    res.json(debts);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
-
-// GET CUSTOMER DEBTS
-export const getCustomerDebts = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const debt = await Debt.findOne({ customer: id }).populate("customer");
-    if (!debt) return res.json({ message: "No debt for this customer", debt: null });
-    res.json(debt);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
-
-// PAY DEBT
-export const payDebt = async (req, res) => {
-  try {
-    const { id } = req.params; // debt id
-    const { payAmount } = req.body;
-
-    const debt = await Debt.findById(id);
-
-    if (!debt) return res.status(404).json({ message: "Debt not found" });
-
-    // Check if payAmount is greater than remaining debt
-    const remaining = debt.amount - debt.paidAmount;
-    if (payAmount > remaining) {
-      return res.status(400).json({ message: `Customer only owes $${remaining}` });
+    
+    // Find existing debt or create new
+    let debt = await Debt.findOne({ customer: customerId });
+    
+    if (!debt) {
+      debt = new Debt({
+        customer: customerId,
+        transactions: [{
+          description,
+          amount,
+          type: type || 'debt'
+        }]
+      });
+    } else {
+      debt.transactions.push({
+        description,
+        amount,
+        type: type || 'debt'
+      });
     }
-
-    debt.paidAmount += payAmount;
-
-    if (debt.paidAmount === debt.amount) debt.status = "paid";
-    else debt.status = "partial";
-
+    
     await debt.save();
-    res.json({ message: "Payment successful", debt });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
+    
+    // Populate customer info
+    const result = await Debt.findById(debt._id)
+      .populate('customer', 'name phone');
+    
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
   }
 };
-// QUICK CREATE CUSTOMER (if not exists)
-export const quickCreateCustomer = async (req, res) => {
+
+// Get all debts with customer info
+export const getAllDebts = async (req, res) => {
   try {
-    const { cusPhone } = req.body;
+    const debts = await Debt.find()
+      .populate('customer', 'name phone')
+      .sort({ createdAt: -1 });
+    
+    res.json(debts);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
 
-    if (!cusPhone)
-      return res.status(400).json({ message: "Phone required" });
-
-    // Check if exists
-    let existing = await Customer.findOne({ cusPhone });
-    if (existing) {
-      return res.json({ message: "Customer already exists", customer: existing });
+// Get single debt record
+export const getDebt = async (req, res) => {
+  try {
+    const debt = await Debt.findOne({ customer: req.params.customerId })
+      .populate('customer', 'name phone');
+    
+    if (!debt) {
+      return res.status(404).json({ 
+        message: 'Deynta lama helin',
+        transactions: [],
+        totalDebt: 0
+      });
     }
-
-    // Create new customer
-    const newCus = await Customer.create({
-      cusname: "Unknown",
-      cusPhone
-    });
-
-    res.status(201).json({ message: "Customer created", customer: newCus });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
+    
+    res.json(debt);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 };

@@ -20,7 +20,10 @@ import Customers from './admin/Customers.jsx';
 import Products from './admin/Products.jsx';
 import Sales from './admin/Sales.jsx';
 import Debts from './admin/Debts.jsx';
-import Repairing from './admin/Repairing.jsx';
+import Repairing from './admin/Expense.jsx';
+import Report from './admin/Report.jsx';
+import Expense from './admin/Expense.jsx';
+import Users from './admin/Users.jsx';
 //import Users from './admin/Users.jsx';
 
 
@@ -52,10 +55,14 @@ const router = createBrowserRouter([
         element:<Products />},
         {path:"/debt",
         element:<Debts/> },
-        {path:"/repairing",
-        element:<Repairing/> },
+        {path:"/expense",
+        element:<Expense/> },
         // {path:"/users",
         // element:<Users/> },
+        { path: "/reports", 
+          element: <Report /> },
+        { path: "/users", 
+          element: <Users /> },
 
         
 
