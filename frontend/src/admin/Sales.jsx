@@ -114,7 +114,7 @@ const Sales = () => {
       params.append('order', sortOrder);
       
       const response = await axios.get(`${API_URL}?${params}`);
-      setSales(response.data.data || []);
+      setSales(response.data || []);
       setError('');
     } catch (err) {
       toast.error('Failed to fetch sales');
@@ -129,7 +129,7 @@ const Sales = () => {
     try {
       setLoadingProducts(true);
       const response = await axios.get('https://backendapp-qtb2.onrender.com/api/products');
-      setProducts(response.data.data || []);
+      setProducts(response.data || []);
     } catch (err) {
       console.error('Failed to fetch products:', err);
     } finally {
@@ -141,7 +141,7 @@ const Sales = () => {
   const fetchCustomers = async () => {
     try {
       const response = await axios.get('https://backendapp-qtb2.onrender.com/api/customers');
-      setCustomers(response.data.data || []);
+      setCustomers(response.data || []);
     } catch (err) {
       console.error('Failed to fetch customers:', err);
     }
