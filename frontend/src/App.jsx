@@ -3,28 +3,31 @@ import { Outlet } from "react-router-dom";
 import Header from "./components/Header";
 import Sidebar from "./components/Sidebar";
 import { useUser } from "./hooks/useUser";
+import { useTheme } from "./hooks/useTheme";
 
 export default function App() {
   const { user } = useUser();
+  const { theme } = useTheme();
 
-  // Haddii weli aan la helin user (ama loading state), waxaad soo celin kartaa
-  // spinner ama <Outlet /> kaliya si aanay u dhicin flicker.
+  // Haddii weli aan la helin user (ama loading state)
   if (!user) {
     return (
-      <>
-     <Header />
-      <Outlet />
-      </>
+      <div className={theme === 'dark' ? 'dark bg-gray-900 min-h-screen' : 'min-h-screen'}>
+        <Header />
+        <Outlet />
+      </div>
     )
   }
 
   // Haddii uu yahay admin -> Sidebar layout
   if (user?.role === "admin") {
     return (
-      <div className="flex">
+      <div className={`${theme === 'dark' ? 'dark bg-gray-900' : ''} flex min-h-screen`}>
         <Sidebar />
-        <main className="flex-1 p-4 ml-0 md:ml-64">
-          <Outlet />
+        <main className="flex-1 p-4 ml-0 md:ml-16 lg:ml-64 transition-all duration-300">
+          <div className={`${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+            <Outlet />
+          </div>
         </main>
       </div>
     );
@@ -33,14 +36,17 @@ export default function App() {
   // Haddii uu yahay user caadi ah -> Header layout
   if (user?.role === "user") {
     return (
-      <>
+      <div className={theme === 'dark' ? 'dark bg-gray-900 min-h-screen' : 'min-h-screen'}>
         <Header />
-        
-          <Outlet />
-      </>
+        <Outlet />
+      </div>
     );
   }
 
   // Default (haddii role kale ama empty)
-  return <Outlet />;
+  return (
+    <div className={theme === 'dark' ? 'dark bg-gray-900 min-h-screen' : 'min-h-screen'}>
+      <Outlet />
+    </div>
+  );
 }

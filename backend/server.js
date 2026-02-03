@@ -9,9 +9,7 @@ import TokenRoute from './routes/TokenRoute.js';
 import CustomerRoutes from './routes/CustomerRoutes.js'
 import ProductRoutes from './routes/ProductRoutes.js'
 import SalesRoutes from  './routes/SalesRoutes.js'
-import reportRoutes from './routes/reportRoutes.js';
-import expenseRoutes from './routes/ExpenseRoute.js';
-import debtRoutes from  './routes/debtRoutes.js'
+
 
 import cors from 'cors';
 
@@ -33,9 +31,7 @@ app.use('/api/user', userRouter);
 app.use("/api/customers", CustomerRoutes);
 app.use("/api/Products", ProductRoutes);
 app.use("/api/sales", SalesRoutes);
-app.use('/api/reports', reportRoutes);
-app.use("/api/expenses", expenseRoutes);
-app.use("/api/debts", debtRoutes);
+
 
 
 

@@ -3,6 +3,19 @@ import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { Link, useNavigate } from "react-router-dom";
 import { useUser } from "../hooks/useUser";
+import { useTheme } from "../hooks/useTheme";
+import { 
+  Phone, 
+  Lock, 
+  Eye, 
+  EyeOff, 
+  Smartphone, 
+  User,
+  Shield,
+  LogIn,
+  ChevronRight,
+  Mail
+} from "lucide-react";
 
 const Login = () => {
     const [form, setForm] = useState({
@@ -10,6 +23,7 @@ const Login = () => {
         password: ""
     });
     const { login, user } = useUser();
+    const { theme } = useTheme();
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [rememberMe, setRememberMe] = useState(false);
@@ -20,11 +34,11 @@ const Login = () => {
         else if (user?.role === "user") navigate("/");
     }, [user]);
 
-    // Check for remembered email
+    // Check for remembered phone
     useEffect(() => {
-        const rememberedEmail = localStorage.getItem("rememberedEmail");
-        if (rememberedEmail) {
-            setForm(prev => ({ ...prev, email: rememberedEmail }));
+        const rememberedPhone = localStorage.getItem("rememberedPhone");
+        if (rememberedPhone) {
+            setForm(prev => ({ ...prev, phone: rememberedPhone }));
             setRememberMe(true);
         }
     }, []);
@@ -42,23 +56,22 @@ const Login = () => {
         
         try {
             const { data } = await axios.post('/api/user/loginuser', form, { withCredentials: true });
-            console.log(data.role);
             toast.success("Login successful!");
             
-            // Remember email if checkbox is checked
+            // Remember phone if checkbox is checked
             if (rememberMe) {
-                localStorage.setItem("rememberedEmail", form.phone);
+                localStorage.setItem("rememberedPhone", form.phone);
             } else {
-                localStorage.removeItem("rememberedEmail");
+                localStorage.removeItem("rememberedPhone");
             }
             
             setLoading(false);
             login(data, data.expirein);
             
             if (data.role === "admin") {
-                navigate("/sidebar");
+                navigate("/admin-dashboard");
             } else {
-                navigate("/header");
+                navigate("/");
             }
         } catch (error) {
             setLoading(false);
@@ -71,31 +84,74 @@ const Login = () => {
         setShowPassword(!showPassword);
     };
 
+    // Theme-based styling
+    const containerClasses = theme === 'dark' 
+        ? "bg-gradient-to-br from-gray-900 to-gray-800" 
+        : "bg-gradient-to-br from-green-50 to-gray-50";
+
+    const cardClasses = theme === 'dark'
+        ? "bg-gray-800/90 backdrop-blur-lg border-gray-700 text-gray-100"
+        : "bg-white/90 backdrop-blur-lg border-green-100 text-gray-900";
+
+    const inputClasses = theme === 'dark'
+        ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:ring-green-500 focus:border-green-500"
+        : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:ring-green-500 focus:border-green-500";
+
+    const buttonClasses = theme === 'dark'
+        ? "bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
+        : "bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white";
+
+    const linkClasses = theme === 'dark'
+        ? "text-green-400 hover:text-green-300"
+        : "text-green-600 hover:text-green-500";
+
+    const labelClasses = theme === 'dark'
+        ? "text-gray-300"
+        : "text-gray-700";
+
+    const checkboxClasses = theme === 'dark'
+        ? "bg-gray-700 border-gray-600 text-green-500 focus:ring-green-500"
+        : "bg-gray-100 border-gray-300 text-green-600 focus:ring-green-500";
+
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-white p-4">
+        <div className={`min-h-screen flex items-center justify-center p-4 transition-colors duration-300 ${containerClasses}`}>
             {/* Background Decorations */}
             <div className="absolute inset-0 overflow-hidden">
-                <div className="absolute -top-40 -right-40 w-80 h-80 bg-green-100 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob"></div>
-                <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-emerald-100 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-2000"></div>
-                <div className="absolute top-40 left-40 w-80 h-80 bg-lime-100 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-4000"></div>
+                {theme === 'dark' ? (
+                    <>
+                        <div className="absolute -top-40 -right-40 w-80 h-80 bg-green-900/20 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob"></div>
+                        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-emerald-900/20 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-2000"></div>
+                        <div className="absolute top-40 left-40 w-80 h-80 bg-lime-900/20 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-4000"></div>
+                    </>
+                ) : (
+                    <>
+                        <div className="absolute -top-40 -right-40 w-80 h-80 bg-green-100 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob"></div>
+                        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-emerald-100 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-2000"></div>
+                        <div className="absolute top-40 left-40 w-80 h-80 bg-lime-100 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-4000"></div>
+                    </>
+                )}
             </div>
 
-            <div className="relative w-full max-w-md">
+            <div className="relative w-full max-w-md animate-fade-in-up">
                 {/* Main Card */}
-                <div className="bg-white/90 backdrop-blur-lg rounded-3xl shadow-2xl border border-green-100 p-8 animate-fade-in-up">
+                <div className={`rounded-3xl shadow-2xl border p-8 ${cardClasses}`}>
                     {/* Header */}
                     <div className="text-center mb-8">
                         <div className="flex justify-center mb-4">
-                            <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
-                                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                                </svg>
+                            <div className={`w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg ${
+                                theme === 'dark' 
+                                    ? 'bg-gradient-to-br from-green-600 to-emerald-700' 
+                                    : 'bg-gradient-to-br from-green-500 to-emerald-600'
+                            }`}>
+                                <Shield size={32} className="text-white" />
                             </div>
                         </div>
-                        <h1 className="text-3xl font-bold text-green-700">
-                           Gal Hadda
+                        <h1 className={`text-3xl font-bold ${
+                            theme === 'dark' ? 'text-white' : 'text-green-700'
+                        }`}>
+                            Gal Hadda
                         </h1>
-                        <p className="text-gray-600 mt-2">
+                        <p className={`mt-2 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
                             Ku soo gal akoonkaaga si aad u sii waddo
                         </p>
                     </div>
@@ -103,21 +159,19 @@ const Login = () => {
                     <form onSubmit={handleSubmit} className="space-y-6">
                         {/* Phone Field */}
                         <div>
-                            <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
-                               Telefoon
+                            <label htmlFor="phone" className={`block text-sm font-medium mb-2 ${labelClasses}`}>
+                                Telefoon
                             </label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                                    </svg>
+                                    <Phone size={20} className={theme === 'dark' ? 'text-gray-400' : 'text-gray-500'} />
                                 </div>
                                 <input
                                     type="text"
                                     id="phone"
                                     value={form.phone}
                                     onChange={handleChange}
-                                    className="block w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl bg-white text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200"
+                                    className={`block w-full pl-12 pr-4 py-3 border rounded-xl focus:ring-2 focus:border-transparent transition-all duration-200 ${inputClasses}`}
                                     placeholder="Gali telefoonkaaga"
                                     required
                                 />
@@ -126,57 +180,50 @@ const Login = () => {
 
                         {/* Password Field */}
                         <div>
-                            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+                            <label htmlFor="password" className={`block text-sm font-medium mb-2 ${labelClasses}`}>
                                 Password
                             </label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                                    </svg>
+                                    <Lock size={20} className={theme === 'dark' ? 'text-gray-400' : 'text-gray-500'} />
                                 </div>
                                 <input
                                     type={showPassword ? "text" : "password"}
                                     id="password"
                                     value={form.password}
                                     onChange={handleChange}
-                                    className="block w-full pl-10 pr-12 py-3 border border-gray-300 rounded-xl bg-white text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200"
+                                    className={`block w-full pl-12 pr-12 py-3 border rounded-xl focus:ring-2 focus:border-transparent transition-all duration-200 ${inputClasses}`}
                                     placeholder="Gali password kaaga"
                                     required
                                 />
                                 <button
                                     type="button"
                                     onClick={togglePasswordVisibility}
-                                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-green-600 transition-colors duration-200"
+                                    className={`absolute inset-y-0 right-0 pr-3 flex items-center transition-colors duration-200 ${
+                                        theme === 'dark' ? 'text-gray-400 hover:text-green-400' : 'text-gray-400 hover:text-green-600'
+                                    }`}
                                 >
-                                    {showPassword ? (
-                                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                        </svg>
-                                    ) : (
-                                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                                        </svg>
-                                    )}
+                                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                                 </button>
                             </div>
                         </div>
 
                         {/* Remember Me & Forgot Password */}
                         <div className="flex items-center justify-between">
-                            <label className="flex items-center">
+                            <label className="flex items-center cursor-pointer">
                                 <input
                                     type="checkbox"
                                     checked={rememberMe}
                                     onChange={(e) => setRememberMe(e.target.checked)}
-                                    className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
+                                    className={`w-4 h-4 rounded focus:ring-2 focus:ring-offset-0 ${checkboxClasses}`}
                                 />
-                                <span className="ml-2 text-sm text-gray-600">I xasuuso</span>
+                                <span className={`ml-2 text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>
+                                    I xasuuso
+                                </span>
                             </label>
                             {/* <Link
                                 to="/forgot-password"
-                                className="text-sm text-green-600 hover:text-green-500 transition-colors duration-200"
+                                className={`text-sm transition-colors duration-200 ${linkClasses}`}
                             >
                                 Halmaasay passwordka?
                             </Link> */}
@@ -186,26 +233,36 @@ const Login = () => {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold py-3 px-4 rounded-xl transition-all duration-300 transform hover:scale-105 disabled:scale-100 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
+                            className={`w-full font-semibold py-3 px-4 rounded-xl transition-all duration-300 transform hover:scale-105 disabled:scale-100 disabled:cursor-not-allowed shadow-lg hover:shadow-xl disabled:opacity-70 flex items-center justify-center gap-2 ${buttonClasses}`}
                         >
                             {loading ? (
-                                <div className="flex items-center justify-center">
-                                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
+                                <>
+                                    <div className={`animate-spin rounded-full h-5 w-5 border-b-2 ${
+                                        theme === 'dark' ? 'border-white' : 'border-white'
+                                    }`}></div>
                                     wax yar sug...
-                                </div>
+                                </>
                             ) : (
-                                "Gal Hadda"
+                                <>
+                                    <LogIn size={20} />
+                                    Gal Hadda
+                                    <ChevronRight size={20} />
+                                </>
                             )}
                         </button>
                     </form>
 
+                    {/* Divider */}
+                   
+
+                    {/* Register Link */}
                     
                 </div>
 
-              
+                {/* Additional Info */}
+                <div className={`mt-6 text-center text-sm ${theme === 'dark' ? 'text-gray-500' : 'text-gray-600'}`}>
+                    <p>By logging in, you agree to our Terms of Service and Privacy Policy</p>
+                </div>
             </div>
 
             {/* Custom CSS for animations */}

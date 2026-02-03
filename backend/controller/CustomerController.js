@@ -1,15 +1,93 @@
-import mongoose from "mongoose";
 import Customer from "../model/Customers.js";
+import mongoose from "mongoose";
 
-/**
- * @desc    Create a new customer
- * @route   POST /api/customers
- * @access  Public
- */
+// @desc    Get all customers
+// @route   GET /api/customers
+// @access  Private
+export const getCustomers = async (req, res) => {
+  try {
+    const { page = 1, limit = 20, search = '' } = req.query;
+    
+    const query = {};
+    
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { phone: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    const customers = await Customer.find(query)
+      .sort({ createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .select('-__v');
+    
+    const total = await Customer.countDocuments(query);
+    
+    res.status(200).json({
+      success: true,
+      data: customers,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(total / limit)
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch customers",
+      error: error.message
+    });
+  }
+};
+
+// @desc    Get single customer
+// @route   GET /api/customers/:id
+// @access  Private
+export const getCustomer = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid customer ID"
+      });
+    }
+    
+    const customer = await Customer.findById(id).select('-__v');
+    
+    if (!customer) {
+      return res.status(404).json({
+        success: false,
+        message: "Customer not found"
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      data: customer
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch customer",
+      error: error.message
+    });
+  }
+};
+
+// @desc    Create new customer
+// @route   POST /api/customers
+// @access  Private
 export const createCustomer = async (req, res) => {
   try {
-    const { name, phone } = req.body;
-
+    const { name, phone, email, address, notes } = req.body;
+    
     // Validate required fields
     if (!name || !phone) {
       return res.status(400).json({
@@ -17,326 +95,178 @@ export const createCustomer = async (req, res) => {
         message: "Name and phone are required"
       });
     }
-
-    // Check if customer with phone already exists
+    
+    // Check if phone already exists
     const existingCustomer = await Customer.findOne({ phone });
     if (existingCustomer) {
-      return res.status(409).json({
+      return res.status(400).json({
         success: false,
         message: "Customer with this phone number already exists"
       });
     }
-
-    const customer = await Customer.create({ name, phone });
-
+    
+    const customer = await Customer.create({
+      name,
+      phone,
+      email,
+      address,
+      notes
+    });
+    
     res.status(201).json({
       success: true,
       message: "Customer created successfully",
       data: customer
     });
   } catch (error) {
-    console.error("Create Customer Error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Server error",
-      error: error.message
-    });
-  }
-};
-
-/**
- * @desc    Get all customers
- * @route   GET /api/customers
- * @access  Public
- */
-export const getAllCustomers = async (req, res) => {
-  try {
-    // Pagination
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
-
-    // Search functionality
-    const searchQuery = req.query.search || "";
-    const query = searchQuery
-      ? {
-          $or: [
-            { name: { $regex: searchQuery, $options: "i" } },
-            { phone: { $regex: searchQuery, $options: "i" } }
-          ]
-        }
-      : {};
-
-    // Sorting
-    const sortField = req.query.sortBy || "createdAt";
-    const sortOrder = req.query.sortOrder === "asc" ? 1 : -1;
-    const sort = { [sortField]: sortOrder };
-
-    // Execute query
-    const customers = await Customer.find(query)
-      .sort(sort)
-      .skip(skip)
-      .limit(limit);
-
-    // Get total count for pagination info
-    const total = await Customer.countDocuments(query);
-
-    res.status(200).json({
-      success: true,
-      message: "Customers retrieved successfully",
-      data: customers,
-      pagination: {
-        page,
-        limit,
-        total,
-        pages: Math.ceil(total / limit)
-      }
-    });
-  } catch (error) {
-    console.error("Get All Customers Error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Server error",
-      error: error.message
-    });
-  }
-};
-
-/**
- * @desc    Get single customer by ID
- * @route   GET /api/customers/:id
- * @access  Public
- */
-export const getCustomerById = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    // Validate MongoDB ID
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+    if (error.code === 11000) {
       return res.status(400).json({
         success: false,
-        message: "Invalid customer ID"
+        message: "Phone number already exists"
       });
     }
-
-    const customer = await Customer.findById(id);
-
-    if (!customer) {
-      return res.status(404).json({
-        success: false,
-        message: "Customer not found"
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      message: "Customer retrieved successfully",
-      data: customer
-    });
-  } catch (error) {
-    console.error("Get Customer By ID Error:", error);
+    
     res.status(500).json({
       success: false,
-      message: "Server error",
+      message: "Failed to create customer",
       error: error.message
     });
   }
 };
 
-/**
- * @desc    Update customer by ID
- * @route   PUT /api/customers/:id
- * @access  Public
- */
+// @desc    Update customer
+// @route   PUT /api/customers/:id
+// @access  Private
 export const updateCustomer = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, phone } = req.body;
-
-    // Validate MongoDB ID
+    const { name, phone, email, address, notes } = req.body;
+    
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({
         success: false,
         message: "Invalid customer ID"
       });
     }
-
-    // Check if customer exists
-    const existingCustomer = await Customer.findById(id);
-    if (!existingCustomer) {
-      return res.status(404).json({
-        success: false,
-        message: "Customer not found"
-      });
-    }
-
+    
     // Check if phone is being updated and if it already exists
-    if (phone && phone !== existingCustomer.phone) {
-      const phoneExists = await Customer.findOne({ 
+    if (phone) {
+      const existingCustomer = await Customer.findOne({ 
         phone, 
         _id: { $ne: id } 
       });
-      if (phoneExists) {
-        return res.status(409).json({
+      
+      if (existingCustomer) {
+        return res.status(400).json({
           success: false,
           message: "Another customer with this phone number already exists"
         });
       }
     }
-
-    // Update customer
-    const updatedCustomer = await Customer.findByIdAndUpdate(
+    
+    const customer = await Customer.findByIdAndUpdate(
       id,
-      { name, phone },
+      { name, phone, email, address, notes },
       { new: true, runValidators: true }
-    );
-
-    res.status(200).json({
-      success: true,
-      message: "Customer updated successfully",
-      data: updatedCustomer
-    });
-  } catch (error) {
-    console.error("Update Customer Error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Server error",
-      error: error.message
-    });
-  }
-};
-
-/**
- * @desc    Delete customer by ID
- * @route   DELETE /api/customers/:id
- * @access  Public
- */
-export const deleteCustomer = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    // Validate MongoDB ID
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid customer ID"
-      });
-    }
-
-    // Check if customer exists
-    const customer = await Customer.findById(id);
+    ).select('-__v');
+    
     if (!customer) {
       return res.status(404).json({
         success: false,
         message: "Customer not found"
       });
     }
-
-    // Delete customer
-    await Customer.findByIdAndDelete(id);
-
+    
     res.status(200).json({
       success: true,
-      message: "Customer deleted successfully",
-      data: { id }
+      message: "Customer updated successfully",
+      data: customer
     });
   } catch (error) {
-    console.error("Delete Customer Error:", error);
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: "Phone number already exists"
+      });
+    }
+    
     res.status(500).json({
       success: false,
-      message: "Server error",
+      message: "Failed to update customer",
       error: error.message
     });
   }
 };
 
-/**
- * @desc    Bulk delete customers
- * @route   DELETE /api/customers
- * @access  Public
- */
-export const bulkDeleteCustomers = async (req, res) => {
+// @desc    Delete customer
+// @route   DELETE /api/customers/:id
+// @access  Private
+export const deleteCustomer = async (req, res) => {
   try {
-    const { ids } = req.body;
-
-    // Validate ids array
-    if (!Array.isArray(ids) || ids.length === 0) {
+    const { id } = req.params;
+    
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({
         success: false,
-        message: "IDs array is required"
+        message: "Invalid customer ID"
       });
     }
-
-    // Validate all IDs
-    const invalidIds = ids.filter(id => !mongoose.Types.ObjectId.isValid(id));
-    if (invalidIds.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid customer IDs provided",
-        invalidIds
-      });
-    }
-
-    // Delete customers
-    const result = await Customer.deleteMany({ _id: { $in: ids } });
-
-    if (result.deletedCount === 0) {
+    
+    const customer = await Customer.findByIdAndDelete(id);
+    
+    if (!customer) {
       return res.status(404).json({
         success: false,
-        message: "No customers found to delete"
+        message: "Customer not found"
       });
     }
-
+    
     res.status(200).json({
       success: true,
-      message: `${result.deletedCount} customer(s) deleted successfully`,
-      data: { deletedCount: result.deletedCount }
+      message: "Customer deleted successfully"
     });
   } catch (error) {
-    console.error("Bulk Delete Customers Error:", error);
     res.status(500).json({
       success: false,
-      message: "Server error",
+      message: "Failed to delete customer",
       error: error.message
     });
   }
 };
 
-/**
- * @desc    Get customer statistics
- * @route   GET /api/customers/stats
- * @access  Public
- */
-export const getCustomerStats = async (req, res) => {
+// @desc    Search customers
+// @route   GET /api/customers/search
+// @access  Private
+export const searchCustomers = async (req, res) => {
   try {
-    const totalCustomers = await Customer.countDocuments();
+    const { query } = req.query;
     
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const newToday = await Customer.countDocuments({
-      createdAt: { $gte: today }
-    });
-
-    const lastWeek = new Date();
-    lastWeek.setDate(lastWeek.getDate() - 7);
-    const newLastWeek = await Customer.countDocuments({
-      createdAt: { $gte: lastWeek }
-    });
-
+    if (!query || query.trim() === '') {
+      return res.status(200).json({
+        success: true,
+        data: []
+      });
+    }
+    
+    const customers = await Customer.find({
+      $or: [
+        { name: { $regex: query, $options: 'i' } },
+        { phone: { $regex: query, $options: 'i' } },
+        { email: { $regex: query, $options: 'i' } }
+      ]
+    })
+    .sort({ name: 1 })
+    .limit(10)
+    .select('name phone email');
+    
     res.status(200).json({
       success: true,
-      message: "Customer statistics retrieved successfully",
-      data: {
-        totalCustomers,
-        newToday,
-        newLastWeek
-      }
+      data: customers
     });
   } catch (error) {
-    console.error("Get Customer Stats Error:", error);
     res.status(500).json({
       success: false,
-      message: "Server error",
+      message: "Failed to search customers",
       error: error.message
     });
   }
