@@ -18,7 +18,7 @@ const PORT = 8000
 
 // ✅ CORS FIRST (MUHIIM)
 app.use(cors({
-  origin: 'https://inventory-management-system-1mcj.onrender.com',
+  origin: 'https://pos-point-of-sale.onrender.com',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   credentials: true
 }));

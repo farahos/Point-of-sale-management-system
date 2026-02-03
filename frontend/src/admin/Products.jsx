@@ -53,7 +53,7 @@ const Product = () => {
   const [sortBy, setSortBy] = useState('name');
   const [sortOrder, setSortOrder] = useState('asc');
   
-  const API_URL = 'https://posapp-o3d4.onrender.com/api/user/loginuser/api/products';
+  const API_URL = 'https://posapp-o3d4.onrender.com/api/products';
 
   // Theme-based styling
   const cardClasses = () => {
