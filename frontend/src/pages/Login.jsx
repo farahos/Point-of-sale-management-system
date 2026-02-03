@@ -55,7 +55,7 @@ const Login = () => {
         setLoading(true);
         
         try {
-            const { data } = await axios.post('https://posapp-o3d4.onrender.com/api/user/loginuser', form, { withCredentials: true });
+            const { data } = await axios.post('https://backendapp-qtb2.onrender.com/api/user/loginuser', form, { withCredentials: true });
             toast.success("Login successful!");
             
             // Remember phone if checkbox is checked

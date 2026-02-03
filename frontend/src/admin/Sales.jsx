@@ -56,7 +56,7 @@ const Sales = () => {
   const [sortBy, setSortBy] = useState('date'); // 'date', 'amount', 'profit', 'quantity'
   const [sortOrder, setSortOrder] = useState('desc');
   
-  const API_URL = 'https://posapp-o3d4.onrender.com/api/sales';
+  const API_URL = 'https://backendapp-qtb2.onrender.com/api/sales';
 
   // Theme-based styling
   const cardClasses = () => {

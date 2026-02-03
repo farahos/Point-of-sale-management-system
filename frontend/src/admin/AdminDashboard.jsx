@@ -120,9 +120,9 @@ const Dashboard = () => {
       const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
       
       const [products, customers, sales] = await Promise.all([
-        fetchData('https://posapp-o3d4.onrender.com/api/products'),
-        fetchData('https://posapp-o3d4.onrender.com/api/customers'),
-        fetchData('https://posapp-o3d4.onrender.com/api/sales')
+        fetchData('https://backendapp-qtb2.onrender.com/api/products'),
+        fetchData('https://backendapp-qtb2.onrender.com/api/customers'),
+        fetchData('https://backendapp-qtb2.onrender.com/api/sales')
       ]);
 
       const totalProducts = Array.isArray(products) ? products.length : 0;

@@ -76,7 +76,7 @@ const Customer = () => {
         order: sortOrder
       };
       
-      const response = await axios.get('https://posapp-o3d4.onrender.com/api/customers', { params });
+      const response = await axios.get('https://backendapp-qtb2.onrender.com/api/customers', { params });
       
       if (response.data.success) {
         setCustomers(response.data.data);
@@ -213,7 +213,7 @@ const Customer = () => {
   const handleDeleteCustomer = async (id) => {
     if (window.confirm('Are you sure you want to delete this customer?')) {
       try {
-        const response = await axios.delete(`https://posapp-o3d4.onrender.com/api/customers/${id}`);
+        const response = await axios.delete(`https://backendapp-qtb2.onrender.com/api/customers/${id}`);
         
         if (response.data.success) {
           toast.success('Customer deleted successfully!');
@@ -234,7 +234,7 @@ const Customer = () => {
 
     if (window.confirm(`Are you sure you want to delete ${selectedCustomers.length} customer(s)?`)) {
       try {
-        await axios.delete('https://posapp-o3d4.onrender.com/api/customers/bulk', { data: { ids: selectedCustomers } });
+        await axios.delete('https://backendapp-qtb2.onrender.com/api/customers/bulk', { data: { ids: selectedCustomers } });
         toast.success(`${selectedCustomers.length} customer(s) deleted successfully!`);
         setSelectedCustomers([]);
         fetchCustomers(pagination.page);
@@ -291,7 +291,7 @@ const Customer = () => {
       };
 
       if (modalMode === 'add') {
-        const response = await axios.post('https://posapp-o3d4.onrender.com/api/customers', customerData);
+        const response = await axios.post('https://backendapp-qtb2.onrender.com/api/customers', customerData);
         
         if (response.data.success) {
           toast.success('Customer added successfully!');
@@ -299,7 +299,7 @@ const Customer = () => {
           fetchCustomers(1);
         }
       } else {
-        const response = await axios.put(`https://posapp-o3d4.onrender.com/api/customers/${currentCustomer._id}`, customerData);
+        const response = await axios.put(`https://backendapp-qtb2.onrender.com/api/customers/${currentCustomer._id}`, customerData);
         
         if (response.data.success) {
           toast.success('Customer updated successfully!');
