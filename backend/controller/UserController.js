@@ -262,44 +262,75 @@ export const updateUserRole = async (req, res) => {
 };
 
 // ✅ Update username, phone & password (with old password verification)
+// export const updateUser = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const { username, phone, oldPassword, newPassword } = req.body;
+
+//     // Hel user-ka, password-na ha la soo celiyo si loo hubiyo
+//     const user = await User.findById(id).select("+password");
+//     if (!user) {
+//       return res.status(404).json({ message: "User not found" });
+//     }
+
+//     // ✅ Username update
+//     if (username) {
+//       user.username = username;
+//     }
+
+//     // ✅ Phone update
+//     if (phone) {
+//       user.phone = phone;
+//     }
+
+//     // ✅ Password update — hubi in oldPassword uu sax yahay
+//     if (newPassword) {
+//       if (!oldPassword) {
+//         return res.status(400).json({
+//           message: "Old password is required to set a new password",
+//         });
+//       }
+
+//       const isMatch = await bcrypt.compare(oldPassword, user.password);
+//       if (!isMatch) {
+//         return res.status(401).json({ message: "Old password is incorrect" });
+//       }
+
+//       // Hash new password
+//       const hashedPassword = await bcrypt.hash(newPassword, 10);
+//       user.password = hashedPassword;
+//     }
+
+//     await user.save();
+
+//     const { password, ...userData } = user.toObject();
+
+//     res.status(200).json({
+//       success: true,
+//       message: "User updated successfully",
+//       data: userData,
+//     });
+//   } catch (error) {
+//     console.error("Error updating user:", error);
+//     res.status(500).json({ message: "Error updating user" });
+//   }
+// };
 export const updateUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const { username, phone, oldPassword, newPassword } = req.body;
+    const { username, email, phone, role, status } = req.body;
 
-    // Hel user-ka, password-na ha la soo celiyo si loo hubiyo
-    const user = await User.findById(id).select("+password");
+    const user = await User.findById(id);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // ✅ Username update
-    if (username) {
-      user.username = username;
-    }
-
-    // ✅ Phone update
-    if (phone) {
-      user.phone = phone;
-    }
-
-    // ✅ Password update — hubi in oldPassword uu sax yahay
-    if (newPassword) {
-      if (!oldPassword) {
-        return res.status(400).json({
-          message: "Old password is required to set a new password",
-        });
-      }
-
-      const isMatch = await bcrypt.compare(oldPassword, user.password);
-      if (!isMatch) {
-        return res.status(401).json({ message: "Old password is incorrect" });
-      }
-
-      // Hash new password
-      const hashedPassword = await bcrypt.hash(newPassword, 10);
-      user.password = hashedPassword;
-    }
+    // Update fields haddii la diray
+    if (username) user.username = username;
+    if (email) user.email = email.toLowerCase();
+    if (phone) user.phone = phone;
+    if (role) user.role = role;
+    if (status) user.status = status;
 
     await user.save();
 
@@ -311,7 +342,28 @@ export const updateUser = async (req, res) => {
       data: userData,
     });
   } catch (error) {
-    console.error("Error updating user:", error);
+    console.error("Update user error:", error);
     res.status(500).json({ message: "Error updating user" });
+  }
+};
+
+export const deleteUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    await user.deleteOne();
+
+    res.status(200).json({
+      success: true,
+      message: "User deleted successfully",
+    });
+  } catch (error) {
+    console.error("Delete user error:", error);
+    res.status(500).json({ message: "Error deleting user" });
   }
 };

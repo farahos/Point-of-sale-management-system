@@ -31,7 +31,7 @@ const Login = () => {
 
     useEffect(() => {
         if (user?.role === "admin") navigate("/admin-dashboard");
-        else if (user?.role === "user") navigate("/");
+        else if (user?.role === "user") navigate("/admin-dashboard");
     }, [user]);
 
     // Check for remembered phone
@@ -55,7 +55,7 @@ const Login = () => {
         setLoading(true);
         
         try {
-            const { data } = await axios.post('https://backendapp-qtb2.onrender.com/api/user/loginuser', form, { withCredentials: true });
+            const { data } = await axios.post('/api/user/loginuser', form, { withCredentials: true });
             toast.success("Login successful!");
             
             // Remember phone if checkbox is checked

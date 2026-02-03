@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useUser } from '../hooks/useUser';
+import {  useNavigate } from "react-router-dom";
+
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { 
   RefreshCw, 
@@ -18,6 +21,8 @@ import {
 import { useTheme } from '../hooks/useTheme';
 
 const Dashboard = () => {
+   const { user } = useUser();
+const navigate = useNavigate();
   const { theme } = useTheme();
   const [stats, setStats] = useState({
     products: 0,
@@ -120,9 +125,9 @@ const Dashboard = () => {
       const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
       
       const [products, customers, sales] = await Promise.all([
-        fetchData('https://backendapp-qtb2.onrender.com/api/products'),
-        fetchData('https://backendapp-qtb2.onrender.com/api/customers'),
-        fetchData('https://backendapp-qtb2.onrender.com/api/sales')
+        fetchData('/api/products'),
+        fetchData('/api/customers'),
+        fetchData('/api/sales')
       ]);
 
       const totalProducts = Array.isArray(products) ? products.length : 0;
@@ -163,7 +168,9 @@ const Dashboard = () => {
       setRefreshing(false);
     }
   };
-
+    useEffect(() => {
+        if (!user) navigate("/");
+    }, [user]);
   useEffect(() => {
     fetchDashboardData();
     

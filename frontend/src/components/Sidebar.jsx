@@ -19,7 +19,7 @@ import { useTheme } from "../hooks/useTheme";
 
 const Sidebar = () => {
   const { user, logout } = useUser();
-  const { theme, toggleTheme } = useTheme();
+  const { theme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
@@ -40,7 +40,7 @@ const Sidebar = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  if (!user || user.role !== "admin") return null;
+  if (!user) return null;
 
   // Mobile menu toggle
   const toggleMobileMenu = () => {
@@ -53,6 +53,29 @@ const Sidebar = () => {
       setMobileOpen(false);
     }
   };
+
+  // Define menu items based on user role
+  const getMenuItems = () => {
+    if (user?.role === "admin") {
+      return [
+        { path: "/admin-dashboard", icon: LayoutDashboard, label: "Dashboard" },
+        { path: "/customers", icon: Users, label: "Customers" },
+        { path: "/products", icon: Package, label: "Products" },
+        { path: "/sales", icon: ShoppingBag, label: "Sales" },
+        { path: "/users", icon: Users, label: "Users" },
+        { path: "/settings", icon: Settings, label: "Settings" },
+      ];
+    } else if (user?.role === "user") {
+      return [
+        { path: "/admin-dashboard", icon: LayoutDashboard, label: "Dashboard" },
+        { path: "/customers", icon: Users, label: "Customers" },
+        { path: "/sales", icon: ShoppingBag, label: "Sales" },
+      ];
+    }
+    return [];
+  };
+
+  const navItems = getMenuItems();
 
   const linkClasses = (path) => {
     const isActive = location.pathname === path;
@@ -80,15 +103,6 @@ const Sidebar = () => {
       `;
     }
   };
-
-  const navItems = [
-    { path: "/admin-dashboard", icon: LayoutDashboard, label: "Dashboard" },
-    { path: "/customers", icon: Users, label: "Customers" },
-    { path: "/products", icon: Package, label: "Products" },
-    { path: "/sales", icon: ShoppingBag, label: "Sales" },
-    { path: "/users", icon: ShoppingBag, label: "users" },
-    { path: "/settings", icon: Settings, label: "Settings" },
-  ];
 
   // Sidebar classes
   const sidebarClasses = `
@@ -147,7 +161,7 @@ const Sidebar = () => {
                 text-xl font-bold
                 ${theme === 'dark' ? 'text-green-400' : 'text-green-700'}
               `}>
-                Admin Panel
+                {user.role === "admin" ? "Admin Panel" : "User Panel"}
               </h1>
             )}
             {!isMobile && (
@@ -190,7 +204,7 @@ const Sidebar = () => {
                   text-xs
                   ${theme === 'dark' ? 'text-green-300' : 'text-green-500'}
                 `}>
-                  Administrator
+                  {user.role === "admin" ? "Administrator" : "User"}
                 </p>
               </div>
             </div>
@@ -218,12 +232,8 @@ const Sidebar = () => {
           })}
         </nav>
 
-        {/* Theme Toggle & Logout */}
+        {/* Logout Button */}
         <div className={`p-4 space-y-3 border-t ${theme === 'dark' ? 'border-gray-800' : 'border-green-100'}`}>
-          {/* Theme Toggle */}
-         
-
-          {/* Logout Button */}
           <button
             onClick={() => {
               logout();

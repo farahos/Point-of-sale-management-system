@@ -16,10 +16,10 @@ export default function App() {
         <Header />
         <Outlet />
       </div>
-    )
+    );
   }
 
-  // Haddii uu yahay admin -> Sidebar layout
+  // Layout for admin users
   if (user?.role === "admin") {
     return (
       <div className={`${theme === 'dark' ? 'dark bg-gray-900' : ''} flex min-h-screen`}>
@@ -33,17 +33,21 @@ export default function App() {
     );
   }
 
-  // Haddii uu yahay user caadi ah -> Header layout
+  // Layout for regular users (user role)
   if (user?.role === "user") {
     return (
-      <div className={theme === 'dark' ? 'dark bg-gray-900 min-h-screen' : 'min-h-screen'}>
-        <Header />
-        <Outlet />
+      <div className={`${theme === 'dark' ? 'dark bg-gray-900' : ''} flex min-h-screen`}>
+        <Sidebar />
+        <main className="flex-1 p-4 ml-0 md:ml-16 lg:ml-64 transition-all duration-300">
+          <div className={`${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+            <Outlet />
+          </div>
+        </main>
       </div>
     );
   }
 
-  // Default (haddii role kale ama empty)
+  // Default layout (for other roles or empty)
   return (
     <div className={theme === 'dark' ? 'dark bg-gray-900 min-h-screen' : 'min-h-screen'}>
       <Outlet />

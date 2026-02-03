@@ -7,19 +7,18 @@ import {
   deleteCustomer,
   searchCustomers
 } from '../controller/customerController.js';
+import { authenticate, authorizeRoles } from '../middleware/authmiddleware.js';
 
 const router = express.Router();
 
-router.route('/')
-  .get(getCustomers)
-  .post(createCustomer);
+router.get('/', authenticate,  getCustomers)
 
-router.route('/search')
-  .get(searchCustomers);
+router.post("/", authenticate ,createCustomer);
 
-router.route('/:id')
-  .get(getCustomer)
-  .put(updateCustomer)
-  .delete(deleteCustomer);
+router.get("/", authenticate , searchCustomers);
+
+router.get('/:id',authenticate, getCustomer)
+router.put("/:id", authenticate, updateCustomer)
+  router.delete("/:id", authenticate , authorizeRoles("admin") ,deleteCustomer);
 
 export default router;

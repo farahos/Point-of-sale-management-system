@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import { Navigate } from "react-router-dom";
+
 import { 
   Plus, 
   Trash2, 
@@ -20,8 +22,15 @@ import {
   ShoppingBag
 } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
+import { useUser } from '../hooks/useUser';
 
 const Product = () => {
+    const { user } = useUser();
+  
+   // Redirect non-admin users
+    if (user?.role !== "admin") {
+      return <Navigate to="/admin-dashboard" />;
+    }
   const { theme } = useTheme();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -53,7 +62,7 @@ const Product = () => {
   const [sortBy, setSortBy] = useState('name');
   const [sortOrder, setSortOrder] = useState('asc');
   
-  const API_URL = 'https://backendapp-qtb2.onrender.com/api/products';
+  const API_URL = '/api/products';
 
   // Theme-based styling
   const cardClasses = () => {

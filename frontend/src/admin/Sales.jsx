@@ -56,7 +56,7 @@ const Sales = () => {
   const [sortBy, setSortBy] = useState('date'); // 'date', 'amount', 'profit', 'quantity'
   const [sortOrder, setSortOrder] = useState('desc');
   
-  const API_URL = 'https://backendapp-qtb2.onrender.com/api/sales';
+  const API_URL = '/api/sales';
 
   // Theme-based styling
   const cardClasses = () => {
@@ -114,7 +114,7 @@ const Sales = () => {
       params.append('order', sortOrder);
       
       const response = await axios.get(`${API_URL}?${params}`);
-      setSales(response.data || []);
+      setSales(response.data.data || []);
       setError('');
     } catch (err) {
       toast.error('Failed to fetch sales');
@@ -128,8 +128,8 @@ const Sales = () => {
   const fetchProducts = async () => {
     try {
       setLoadingProducts(true);
-      const response = await axios.get('https://backendapp-qtb2.onrender.com/api/products');
-      setProducts(response.data || []);
+      const response = await axios.get('/api/products');
+      setProducts(response.data.data || []);
     } catch (err) {
       console.error('Failed to fetch products:', err);
     } finally {
@@ -140,8 +140,8 @@ const Sales = () => {
   // Fetch customers for dropdown
   const fetchCustomers = async () => {
     try {
-      const response = await axios.get('https://backendapp-qtb2.onrender.com/api/customers');
-      setCustomers(response.data || []);
+      const response = await axios.get('/api/customers');
+      setCustomers(response.data.data || []);
     } catch (err) {
       console.error('Failed to fetch customers:', err);
     }

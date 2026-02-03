@@ -1,5 +1,6 @@
 // src/components/Settings.jsx
 import { useState } from 'react';
+import { useUser } from '../hooks/useUser';
 import { 
   Moon, 
   Sun, 
@@ -13,9 +14,15 @@ import {
 } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 import toast from "react-hot-toast";
+import { Navigate } from 'react-router-dom';
 
 
 const Settings = () => {
+    const { user } = useUser();
+     // Redirect non-admin users
+  if (user?.role !== "admin") {
+    return <Navigate to="/" />;
+  }
   const { theme, toggleTheme } = useTheme();
   const [settings, setSettings] = useState({
     notifications: true,
