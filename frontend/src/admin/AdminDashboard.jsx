@@ -120,9 +120,9 @@ const Dashboard = () => {
       const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
       
       const [products, customers, sales] = await Promise.all([
-        fetchData('/api/products'),
-        fetchData('/api/customers'),
-        fetchData('/api/sales')
+        fetchData('https://posapp-o3d4.onrender.com/api/user/loginuser/api/products'),
+        fetchData('https://posapp-o3d4.onrender.com/api/user/loginuser/api/customers'),
+        fetchData('https://posapp-o3d4.onrender.com/api/user/loginuser/api/sales')
       ]);
 
       const totalProducts = Array.isArray(products) ? products.length : 0;

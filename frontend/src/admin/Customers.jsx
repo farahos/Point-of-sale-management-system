@@ -76,7 +76,7 @@ const Customer = () => {
         order: sortOrder
       };
       
-      const response = await axios.get('/api/customers', { params });
+      const response = await axios.get('https://posapp-o3d4.onrender.com/api/user/loginuser/api/customers', { params });
       
       if (response.data.success) {
         setCustomers(response.data.data);
