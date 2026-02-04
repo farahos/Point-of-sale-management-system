@@ -12,6 +12,6 @@ userRouter.get('/:id', getSingleUser);
 userRouter.put("/approve/:id", authenticate, approveUser);
 userRouter.put("/inactive/:id",authenticate, inactiveUser);
 userRouter.put('/:id', authenticate , updateUser);
-userRouter.put('/:id', authenticate, authorizeRoles("admin"), deleteUser);
+userRouter.delete('/:id', authenticate, authorizeRoles("admin"), deleteUser);
 
 export default userRouter;

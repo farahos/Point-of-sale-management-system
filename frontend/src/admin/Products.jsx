@@ -306,6 +306,7 @@ const Product = () => {
       try {
         await axios.delete(API_URL, { data: { ids: selectedProducts } });
         setSuccessMessage(`${selectedProducts.length} product(s) deleted successfully!`);
+        
         setSelectedProducts([]);
         fetchProducts();
         fetchStats();
@@ -345,7 +346,7 @@ const Product = () => {
       quantity: '' 
     });
     setEditingId(null);
-    toast.error('');
+    setError('');
   };
 
   // Format currency
