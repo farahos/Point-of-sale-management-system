@@ -8,14 +8,15 @@ import {
   searchCustomers
 } from '../controller/customerController.js';
 import { authenticate, authorizeRoles } from '../middleware/authmiddleware.js';
+import validate from '../middleware/validate.js';
 
 const router = express.Router();
 
-router.get('/', authenticate,  getCustomers)
+router.get('/', authenticate, validate,  getCustomers)
 
-router.post("/", authenticate ,createCustomer);
+router.post("/", authenticate ,  validate,createCustomer);
 
-router.get("/", authenticate , searchCustomers);
+router.get("/", authenticate , validate, searchCustomers);
 
 router.get('/:id',authenticate, getCustomer)
 router.put("/:id", authenticate, updateCustomer)

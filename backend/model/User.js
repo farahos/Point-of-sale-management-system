@@ -36,9 +36,6 @@ const userschema = new mongoose.Schema(
       enum: ["admin", "user"], // kaliya labada door ee la ogol yahay
       default: "user",         // user waa default
     },
-    // ✅ Ku dar fields cusub ee password reset
-    resetPasswordToken: String,
-    resetPasswordExpires: Date,
   },
   {
     timestamps: true,
@@ -58,20 +55,5 @@ userschema.pre("save", async function (next) {
 userschema.methods.comparePassword = async function (givenPassword) {
   return await bcrypt.compare(givenPassword, this.password);
 };
-// ✅ Method cusub oo u sameysa reset token
-userschema.methods.createPasswordResetToken = function() {
- 
-  const resetToken = crypto.randomBytes(32).toString('hex');
-  
-  this.resetPasswordToken = crypto
-    .createHash('sha256')
-    .update(resetToken)
-    .digest('hex');
-  
-  this.resetPasswordExpires = Date.now() + 10 * 60 * 1000; // 10 daqiiqo
-  
-  return resetToken;
-};
-
 const User = mongoose.model("User", userschema);
 export default User;

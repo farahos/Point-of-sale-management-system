@@ -1,5 +1,6 @@
 import Customer from "../model/Customers.js";
 import mongoose from "mongoose";
+import Sale from "../model/Sales.js";
 
 // @desc    Get all customers
 // @route   GET /api/customers
@@ -89,10 +90,10 @@ export const createCustomer = async (req, res) => {
     const { name, phone, email, address, notes } = req.body;
     
     // Validate required fields
-    if (!name || !phone) {
+    if (!name || !phone,!email, !address, !notes ) {
       return res.status(400).json({
         success: false,
-        message: "Name and phone are required"
+        message: "fields is Required"
       });
     }
     
@@ -204,27 +205,38 @@ export const updateCustomer = async (req, res) => {
 export const deleteCustomer = async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({
         success: false,
         message: "Invalid customer ID"
       });
     }
-    
+
+    // 🔴 HUBI HADDII UU CUSTOMER-KU LEEYAHAY SALES
+    const hasSales = await Sale.findOne({ customerId: id });
+
+    if (hasSales) {
+      return res.status(400).json({
+        success: false,
+        message: "Customer cannot be deleted because they have sales records"
+      });
+    }
+
     const customer = await Customer.findByIdAndDelete(id);
-    
+
     if (!customer) {
       return res.status(404).json({
         success: false,
         message: "Customer not found"
       });
     }
-    
+
     res.status(200).json({
       success: true,
       message: "Customer deleted successfully"
     });
+
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -234,9 +246,6 @@ export const deleteCustomer = async (req, res) => {
   }
 };
 
-// @desc    Search customers
-// @route   GET /api/customers/search
-// @access  Private
 export const searchCustomers = async (req, res) => {
   try {
     const { query } = req.query;

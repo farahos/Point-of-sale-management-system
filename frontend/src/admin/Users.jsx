@@ -256,7 +256,7 @@ const Users = () => {
     setErrors(formErrors);
 
     if (Object.keys(formErrors).length > 0) {
-      toast.error("Please fix the errors in the form");
+      toast.error("fields is Required");
       return;
     }
 

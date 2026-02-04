@@ -472,7 +472,7 @@ const Customer = () => {
             </div>
           </div>
           
-          {selectedCustomers.length > 0 && (
+          {/* {selectedCustomers.length > 0 && (
             <button 
               onClick={handleBulkDelete}
               className={buttonClasses('danger')}
@@ -480,7 +480,7 @@ const Customer = () => {
               <Trash2 size={20} />
               Delete Selected ({selectedCustomers.length})
             </button>
-          )}
+          )} */}
         </div>
       </div>
 
@@ -494,7 +494,7 @@ const Customer = () => {
             
             {customers.length > 0 && (
               <div className="flex items-center gap-4 mt-4 md:mt-0">
-                <div className="flex items-center gap-2">
+                {/* <div className="flex items-center gap-2">
                   <input
                     type="checkbox"
                     id="selectAll"
@@ -505,7 +505,7 @@ const Customer = () => {
                   <label htmlFor="selectAll" className="text-sm">
                     Select All
                   </label>
-                </div>
+                </div> */}
               </div>
             )}
           </div>

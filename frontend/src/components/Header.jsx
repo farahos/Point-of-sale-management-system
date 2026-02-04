@@ -148,7 +148,7 @@ const Header = () => {
                   {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
                 </button>
 
-                <Link
+                {/* <Link
                   to="/login"
                   className={`
                     px-4 py-2 rounded-lg font-medium transition-colors
@@ -171,7 +171,7 @@ const Header = () => {
                   `}
                 >
                   Register
-                </Link>
+                </Link> */}
               </>
             )}
           </div>
@@ -306,7 +306,7 @@ const Header = () => {
                 >
                   Login
                 </Link>
-                <Link
+                {/* <Link
                   to="/register"
                   onClick={() => setMobileMenuOpen(false)}
                   className={`
@@ -318,7 +318,7 @@ const Header = () => {
                   `}
                 >
                   Register
-                </Link>
+                </Link> */}
               </div>
             )}
           </div>

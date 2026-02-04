@@ -285,7 +285,7 @@ const Product = () => {
     if (window.confirm('Are you sure you want to delete this product?')) {
       try {
         await axios.delete(`${API_URL}/${id}`);
-        setSuccessMessage('Product deleted successfully!');
+        toast.success("delete Successfuly")
         fetchProducts();
         fetchStats();
         setTimeout(() => setSuccessMessage(''), 3000);

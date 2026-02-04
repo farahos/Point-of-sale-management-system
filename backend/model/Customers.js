@@ -8,22 +8,25 @@ const customerSchema = new mongoose.Schema(
       trim: true
     },
     phone: {
-      type: String,
+      type: Number,
       required: [true, "Phone number is required"],
       trim: true,
      
     },
     email: {
       type: String,
+      required : [true, 'Email is Required'],
       trim: true,
       lowercase: true,
     },
     address: {
       type: String,
+      required : [true, 'address is Required'],
       trim: true
     },
     notes: {
       type: String,
+      required : [true, 'node is Required'],
       trim: true
     },
     totalPurchases: {

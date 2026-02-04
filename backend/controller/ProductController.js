@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import Product from "../model/Products.js";
+import Sale from "../model/Sales.js";
 
 /**
  * @desc    Create a new product
@@ -520,24 +521,21 @@ export const deleteProduct = async (req, res) => {
       });
     }
 
-    // Store product info before deletion
+    // 🔴 HUBI HADDII PRODUCT-KAN LA IIBIYAY
+    const hasSales = await Sale.findOne({ productId: id });
+
+    if (hasSales) {
+      return res.status(400).json({
+        success: false,
+        message: "Product cannot be deleted because it has sales records"
+      });
+    }
+
+    // Calculate info before delete (optional)
     const totalValue = product.costPrice * product.quantity;
     const potentialRevenue = product.sellingPrice * product.quantity;
     const profitPerUnit = product.sellingPrice - product.costPrice;
     const totalPotentialProfit = profitPerUnit * product.quantity;
-
-    const productInfo = {
-      name: product.name,
-      sku: product.sku,
-      category: product.category,
-      quantity: product.quantity,
-      costPrice: product.costPrice,
-      sellingPrice: product.sellingPrice,
-      totalValue,
-      potentialRevenue,
-      profitPerUnit,
-      totalPotentialProfit
-    };
 
     // Delete product
     await Product.findByIdAndDelete(id);
@@ -547,9 +545,17 @@ export const deleteProduct = async (req, res) => {
       message: "Product deleted successfully",
       data: {
         id,
-        ...productInfo
+        name: product.name,
+        sku: product.sku,
+        category: product.category,
+        quantity: product.quantity,
+        totalValue,
+        potentialRevenue,
+        profitPerUnit,
+        totalPotentialProfit
       }
     });
+
   } catch (error) {
     console.error("Delete Product Error:", error);
     res.status(500).json({
@@ -559,6 +565,7 @@ export const deleteProduct = async (req, res) => {
     });
   }
 };
+
 
 /**
  * @desc    Bulk delete products
